@@ -1,7 +1,14 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Zap, Facebook, Instagram, Youtube, Twitter, ShieldCheck, Truck, RefreshCcw, BadgeCheck } from 'lucide-react'
+import { Zap, ShieldCheck, Truck, RefreshCcw, BadgeCheck } from 'lucide-react'
 import { CATEGORIES } from '../../data/products'
+
+const SOCIALS = [
+  { label: 'Facebook', path: 'M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z' },
+  { label: 'Instagram', path: 'M16 3H8a5 5 0 0 0-5 5v8a5 5 0 0 0 5 5h8a5 5 0 0 0 5-5V8a5 5 0 0 0-5-5Zm-4 12.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5Zm5.2-8.2a.9.9 0 1 1 .9-.9.9.9 0 0 1-.9.9Z' },
+  { label: 'YouTube', path: 'M21.6 7.2a2.6 2.6 0 0 0-1.8-1.9C18.2 5 12 5 12 5s-6.2 0-7.8.3A2.6 2.6 0 0 0 2.4 7.2 27.3 27.3 0 0 0 2 12a27.3 27.3 0 0 0 .4 4.8 2.6 2.6 0 0 0 1.8 1.9C5.8 19 12 19 12 19s6.2 0 7.8-.3a2.6 2.6 0 0 0 1.8-1.9A27.3 27.3 0 0 0 22 12a27.3 27.3 0 0 0-.4-4.8ZM10 15V9l5.2 3Z' },
+  { label: 'X', path: 'M17.7 3H21l-7.1 8.2L22.2 21h-6.6l-5.1-6.1L4.6 21H1.3l7.6-8.7L1.8 3h6.8l4.6 5.6Zm-1.2 16h1.8L7.1 4.9H5.2Z' },
+]
 
 export default function Footer() {
   const [email, setEmail] = useState('')
@@ -109,9 +116,9 @@ export default function Footer() {
             ))}
           </ul>
           <div className="mt-5 flex gap-3">
-            {[Facebook, Instagram, Youtube, Twitter].map((Icon, i) => (
-              <a key={i} href="#" aria-label="Social link" className="grid h-9 w-9 place-items-center border border-line text-muted transition-colors hover:border-volt hover:text-volt">
-                <Icon size={16} />
+            {SOCIALS.map((s) => (
+              <a key={s.label} href="#" aria-label={s.label} className="grid h-9 w-9 place-items-center border border-line text-muted transition-colors hover:border-volt hover:text-volt">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d={s.path} /></svg>
               </a>
             ))}
           </div>

@@ -7,7 +7,6 @@ import { toggleWishlist } from '../features/wishlistSlice'
 import { ProductArt } from './ProductArt'
 import Rating from './ui/Rating'
 import { fmt, discounted, discountPct, totalStock } from '../lib/format'
-import { toast } from '../features/uiSlice'
 
 export default function QuickView() {
   const dispatch = useDispatch()

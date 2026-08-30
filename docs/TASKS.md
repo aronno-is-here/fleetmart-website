@@ -14,30 +14,30 @@
 - [x] Git init + .gitignore + first commit
 - [x] GitHub repo created + pushed
 
-## Phase 2 — Client Scaffold & Design System ⬜
-- [ ] Vite + React + Tailwind + Redux Toolkit + React Router + Framer Motion
-- [ ] Tailwind theme tokens: colors (`night/pitch/volt/ember/gold`), fonts (Bebas Neue, Oswald, Inter), animations (marquee, shimmer, fade-up)
-- [ ] Base UI components: Button, Badge, Chip, Skeleton, Rating stars, SectionHeading, Toast system
-- [ ] Global layout shell: dark theme, container, selection color, scrollbar styling
+## Phase 2 — Client Scaffold & Design System ✅
+- [x] Vite + React + Tailwind + Redux Toolkit + React Router + Framer Motion
+- [x] Tailwind theme tokens: colors (`night/pitch/volt/ember/gold`), fonts (Bebas Neue, Oswald, Inter), animations (marquee, shimmer, fade-up)
+- [x] Base UI components: Button, Badge, Chip, Skeleton, Rating stars, SectionHeading, Toast system
+- [x] Global layout shell: dark theme, container, selection color, scrollbar styling
 
-## Phase 3 — Storefront Layout (mock data) ⬜
-- [ ] Announcement ticker (marquee)
-- [ ] Sticky Navbar + mega-menu + mobile drawer + search overlay
-- [ ] Cart drawer (Redux, localStorage persist)
-- [ ] Wishlist drawer/page (Redux, localStorage persist)
-- [ ] Footer (newsletter, links, payment badges, socials)
+## Phase 3 — Storefront Layout (mock data) ✅
+- [x] Announcement ticker (marquee)
+- [x] Sticky Navbar + mega-menu + mobile drawer + search overlay
+- [x] Cart drawer (Redux, localStorage persist)
+- [x] Wishlist drawer/page (Redux, localStorage persist)
+- [x] Footer (newsletter, links, payment badges, socials)
 
-## Phase 4 — Storefront Pages (mock data) ⬜
-- [ ] Home: hero slider, category tiles, featured grid, deal strip w/ countdown, brand marquee, testimonials, stats count-up, newsletter
-- [ ] Shop: filters (category, size, brand, price, team), sort, grid/list, pagination, quick view
-- [ ] Product Details: gallery, variants (size/color), jersey customizer (name/number live SVG preview), stock urgency, add to cart, reviews, related products
-- [ ] Cart page: qty edit, free-shipping progress, coupon, summary
-- [ ] Checkout: multi-step (address → shipping → payment → review), COD + mock gateway
-- [ ] Order confirmation + invoice view
-- [ ] Auth pages: login / register (UI + validation)
-- [ ] Account: profile, orders, order tracking timeline, addresses, wishlist
-- [ ] Static pages: About, Contact, FAQ, Policies, 404
-- [ ] Compare drawer (pin up to 3 products)
+## Phase 4 — Storefront Pages (mock data) ✅
+- [x] Home: hero slider, category tiles, featured grid, deal strip w/ countdown, brand marquee, testimonials, stats count-up, recently viewed
+- [x] Shop: filters (category, size, brand, price, team), sort, URL params, skeleton loading, quick view
+- [x] Product Details: gallery flip, variants (size/color), jersey customizer (name/number live SVG preview), stock urgency, add to cart, reviews, related products
+- [x] Cart page: qty edit, free-shipping progress, coupon (GEARUP10 / MATCHDAY5), summary
+- [x] Checkout: multi-step (address → shipping → payment → review), COD + bKash + card UI
+- [x] Order confirmation
+- [x] Auth pages: login / register (UI + validation)
+- [x] Account: profile, orders + tracking timeline, addresses, wishlist
+- [x] Static pages: About, Contact, FAQ, Policies, 404
+- [ ] Compare drawer (pin up to 3 products) — slice ready, UI pending
 
 ## Phase 5 — API Server ⬜
 - [ ] Express scaffold: config, error handler, security (helmet, cors, rate-limit), validation (zod)
