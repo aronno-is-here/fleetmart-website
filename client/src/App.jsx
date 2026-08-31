@@ -15,6 +15,14 @@ import Contact from './pages/Contact'
 import Faq from './pages/Faq'
 import Policy from './pages/Policy'
 import NotFound from './pages/NotFound'
+import AdminLayout from './pages/admin/AdminLayout'
+import AdminLogin from './pages/admin/AdminLogin'
+import Dashboard from './pages/admin/Dashboard'
+import AdminProducts from './pages/admin/AdminProducts'
+import AdminOrders from './pages/admin/AdminOrders'
+import AdminUsers from './pages/admin/AdminUsers'
+import AdminCoupons from './pages/admin/AdminCoupons'
+import AdminReviews from './pages/admin/AdminReviews'
 
 const router = createBrowserRouter([
   {
@@ -36,6 +44,19 @@ const router = createBrowserRouter([
       { path: '/faq', element: <Faq /> },
       { path: '/policies/:slug', element: <Policy /> },
       { path: '*', element: <NotFound /> },
+    ],
+  },
+  {
+    path: '/admin',
+    element: <AdminLayout />,
+    children: [
+      { path: '', element: <Dashboard /> },
+      { path: 'login', element: <AdminLogin /> },
+      { path: 'products', element: <AdminProducts /> },
+      { path: 'orders', element: <AdminOrders /> },
+      { path: 'users', element: <AdminUsers /> },
+      { path: 'coupons', element: <AdminCoupons /> },
+      { path: 'reviews', element: <AdminReviews /> },
     ],
   },
 ])
