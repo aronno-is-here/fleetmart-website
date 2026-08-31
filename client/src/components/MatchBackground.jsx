@@ -1,50 +1,50 @@
 import { useEffect, useRef, useState } from 'react'
 
 /**
- * MatchBackground — renders a fullscreen looping football video as a fixed
- * background behind all page content. Falls back to a dark ambient canvas
- * if the video fails to load. Respects prefers-reduced-motion (shows a
- * single still frame). Pauses when tab is hidden.
+ * MatchBackground — fullscreen looping football video as fixed background.
+ * Falls back to animated particle canvas if the video source fails to load.
+ * Respects prefers-reduced-motion. Pauses when tab hidden.
  */
 export default function MatchBackground() {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
-  const [videoFailed, setVideoFailed] = useState(false)
+  const [sourceFailed, setSourceFailed] = useState(false)
 
   useEffect(() => {
+    if (sourceFailed) return
     const video = videoRef.current
     if (!video) return
 
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduced) return
 
-    if (reduced) {
-      video.pause()
-      return
-    }
-
-    const play = () => {
-      video.play().catch(() => setVideoFailed(true))
+    const tryPlay = () => {
+      video.play().catch(() => {})
     }
 
     const onVisibility = () => {
       if (document.hidden) {
         video.pause()
       } else {
-        play()
+        tryPlay()
       }
     }
 
+    video.addEventListener('loadeddata', tryPlay)
+    video.addEventListener('canplay', tryPlay)
     document.addEventListener('visibilitychange', onVisibility)
-    play()
+    tryPlay()
 
     return () => {
+      video.removeEventListener('loadeddata', tryPlay)
+      video.removeEventListener('canplay', tryPlay)
       document.removeEventListener('visibilitychange', onVisibility)
       video.pause()
     }
-  }, [videoFailed])
+  }, [sourceFailed])
 
   useEffect(() => {
-    if (!videoFailed) return
+    if (!sourceFailed) return
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
@@ -103,33 +103,42 @@ export default function MatchBackground() {
       cancelAnimationFrame(raf)
       window.removeEventListener('resize', resize)
     }
-  }, [videoFailed])
+  }, [sourceFailed])
 
   return (
     <>
-      {!videoFailed && (
+      {!sourceFailed && (
         <video
           ref={videoRef}
           muted
           loop
           playsInline
           preload="auto"
-          onError={() => setVideoFailed(true)}
-          className="pointer-events-none fixed inset-0 z-0 h-full w-full object-cover"
-          style={{ filter: 'brightness(0.35) saturate(0.7)' }}
-          poster=""
+          onError={() => setSourceFailed(true)}
+          onContextMenu={(e) => e.preventDefault()}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            objectFit: 'cover',
+            pointerEvents: 'none',
+            zIndex: 0,
+            filter: 'brightness(0.5) saturate(0.6) contrast(1.1)',
+          }}
         >
           <source src="/football-bg.mp4" type="video/mp4" />
         </video>
       )}
-      {videoFailed && (
+      {sourceFailed && (
         <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none fixed inset-0 z-0" />
       )}
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 z-0"
         style={{
-          background: 'linear-gradient(180deg, rgba(10,14,19,0.6) 0%, rgba(10,14,19,0.3) 40%, rgba(10,14,19,0.7) 100%)',
+          background: 'linear-gradient(180deg, rgba(10,14,19,0.4) 0%, transparent 50%, rgba(10,14,19,0.5) 100%)',
         }}
       />
     </>
