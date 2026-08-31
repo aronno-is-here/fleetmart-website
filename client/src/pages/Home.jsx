@@ -3,13 +3,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { motion } from 'framer-motion'
 import { ArrowRight, ChevronLeft, ChevronRight, Timer, Quote } from 'lucide-react'
-import { PRODUCTS, CATEGORIES, TEAMS } from '../data/products'
+import { CATEGORIES, TEAMS } from '../data/products'
 import { ProductArt, JerseyArt } from '../components/ProductArt'
 import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
 import SectionHeading from '../components/ui/SectionHeading'
-import { fmt, discounted } from '../lib/format'
-
-/* ---------------- Hero slider ---------------- */
+import { fmt } from '../lib/format'
+import api from '../lib/api'
 
 const SLIDES = [
   {
@@ -54,7 +53,6 @@ function Hero() {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      {/* pitch lines backdrop */}
       <div className="pointer-events-none absolute inset-0 opacity-[0.06]">
         <div className="absolute left-1/2 top-1/2 h-[560px] w-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-chalk" />
         <div className="absolute left-1/2 top-0 h-full w-px bg-chalk" />
@@ -85,7 +83,7 @@ function Hero() {
               <JerseyArt primary={s.team.primary} secondary={s.team.secondary} number="10" name="FLEET" view="front" />
             </div>
           ) : (
-            <ProductArt product={PRODUCTS.find((p) => p.id === 'b1')} />
+            <div className="flex items-center justify-center h-80 text-muted font-head text-sm">BOOTS</div>
           )}
           <div className="absolute -right-2 top-6 border border-volt/40 bg-night/85 px-4 py-2 backdrop-blur sm:-right-6">
             <p className="font-head text-xs uppercase tracking-[0.2em] text-muted">From</p>
@@ -94,7 +92,6 @@ function Hero() {
         </motion.div>
       </div>
 
-      {/* controls */}
       <div className="container-fm relative flex items-center gap-4 pb-8">
         <button onClick={() => setIdx((idx - 1 + SLIDES.length) % SLIDES.length)} aria-label="Previous slide" className="grid h-10 w-10 place-items-center border border-line text-muted transition-colors hover:border-volt hover:text-volt">
           <ChevronLeft size={18} />
@@ -123,53 +120,66 @@ function Hero() {
   )
 }
 
-/* ---------------- Category tiles ---------------- */
-
 function CategoryTiles() {
+  const [counts, setCounts] = useState({})
+
+  useEffect(() => {
+    api.get('/products', { params: { limit: 200 } }).then(({ data }) => {
+      const c = {}
+      CATEGORIES.forEach(cat => { c[cat.id] = 0 })
+      data.products.forEach(p => {
+        if (c[p.category] !== undefined) c[p.category]++
+      })
+      setCounts(c)
+    }).catch(() => {})
+  }, [])
+
   return (
     <section className="container-fm py-16">
       <SectionHeading eyebrow="Find your lane" title="Shop by Category" action="View all" to="/shop" />
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {CATEGORIES.map((c, i) => {
-          const sample = PRODUCTS.find((p) => p.category === c.id)
-          return (
-            <motion.div key={c.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.05, duration: 0.4 }}>
-              <Link to={`/shop?category=${c.id}`} className="group relative block overflow-hidden border border-line bg-pitch transition-colors hover:border-volt/50">
-                <div className="aspect-[4/3] transition-transform duration-300 group-hover:scale-105">
-                  {sample && <ProductArt product={sample} />}
-                </div>
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-night via-night/70 to-transparent p-4 pt-10">
-                  <p className="font-display text-2xl uppercase tracking-wide text-chalk group-hover:text-volt">{c.name}</p>
-                  <p className="text-[11px] uppercase tracking-widest text-muted">{c.blurb}</p>
-                </div>
-              </Link>
-            </motion.div>
-          )
-        })}
+        {CATEGORIES.map((c, i) => (
+          <motion.div key={c.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.05, duration: 0.4 }}>
+            <Link to={`/shop?category=${c.id}`} className="group relative block overflow-hidden border border-line bg-pitch transition-colors hover:border-volt/50">
+              <div className="aspect-[4/3] transition-transform duration-300 group-hover:scale-105 flex items-center justify-center bg-pitch2">
+                <span className="font-display text-4xl text-chalk/10 uppercase">{c.name.slice(0, 2)}</span>
+              </div>
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-night via-night/70 to-transparent p-4 pt-10">
+                <p className="font-display text-2xl uppercase tracking-wide text-chalk group-hover:text-volt">{c.name}</p>
+                <p className="text-[11px] uppercase tracking-widest text-muted">{counts[c.id] || 0} items</p>
+              </div>
+            </Link>
+          </motion.div>
+        ))}
       </div>
     </section>
   )
 }
 
-/* ---------------- Featured grid ---------------- */
-
 function Featured() {
-  const featured = PRODUCTS.filter((p) => p.featured).slice(0, 8)
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    api.get('/products', { params: { featured: '1', limit: 8, sort: 'featured' } })
+      .then(({ data }) => setProducts(data.products))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
   return (
     <section className="border-y border-line bg-pitch/40 py-16">
       <div className="container-fm">
         <SectionHeading eyebrow="Crowd favourites" title="Featured Gear" action="Shop all" to="/shop" />
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          {featured.map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
+          {loading
+            ? Array.from({ length: 4 }).map((_, i) => <ProductCardSkeleton key={i} />)
+            : products.map((p) => <ProductCard key={p._id} product={p} />)}
         </div>
       </div>
     </section>
   )
 }
-
-/* ---------------- Flash deal + countdown ---------------- */
 
 function useCountdown() {
   const target = useRef(new Date().setHours(23, 59, 59, 999))
@@ -189,8 +199,17 @@ function useCountdown() {
 function FlashDeal() {
   const { h, m, s } = useCountdown()
   const navigate = useNavigate()
-  const deal = PRODUCTS.find((p) => p.id === 'j3')
-  const price = discounted(deal)
+  const [deal, setDeal] = useState(null)
+
+  useEffect(() => {
+    api.get('/products', { params: { search: 'volt armada', limit: 1 } })
+      .then(({ data }) => { if (data.products[0]) setDeal(data.products[0]) })
+      .catch(() => {})
+  }, [])
+
+  if (!deal) return null
+
+  const price = deal.discountPrice || deal.price
 
   return (
     <section className="container-fm py-16">
@@ -200,13 +219,13 @@ function FlashDeal() {
           <div>
             <p className="eyebrow mb-3 flex items-center gap-2"><Timer size={14} /> Flash Deal · Ends Tonight</p>
             <h2 className="font-display text-5xl uppercase leading-none tracking-wide text-chalk sm:text-6xl">
-              Volt Armada<br /><span className="text-volt">Special Edition</span>
+              {deal.name.split(' ').slice(0, 2).join(' ')}<br /><span className="text-volt">{deal.name.split(' ').slice(2).join(' ')}</span>
             </h2>
-            <p className="mt-4 max-w-sm text-sm text-muted">500 numbered pieces. Charcoal blackout, volt lightning sleeves, printed name & number included.</p>
+            <p className="mt-4 max-w-sm text-sm text-muted">{deal.description}</p>
             <div className="mt-6 flex items-center gap-4">
               <span className="font-head text-3xl font-semibold text-chalk">{fmt(price)}</span>
-              <span className="text-lg text-muted line-through">{fmt(deal.price)}</span>
-              <span className="bg-ember px-2 py-1 font-head text-sm font-semibold text-white">SAVE ৳{deal.price - price}</span>
+              {deal.discountPrice && <span className="text-lg text-muted line-through">{fmt(deal.price)}</span>}
+              {deal.discountPrice && <span className="bg-ember px-2 py-1 font-head text-sm font-semibold text-white">SAVE ৳{deal.price - price}</span>}
             </div>
             <div className="mt-6 flex items-center gap-2">
               {[[h, 'HRS'], [m, 'MIN'], [s, 'SEC']].map(([v, l]) => (
@@ -218,14 +237,20 @@ function FlashDeal() {
               <button onClick={() => navigate(`/product/${deal.slug}`)} className="btn-volt ml-3 !text-xs">Buy Now</button>
             </div>
           </div>
-          <div className="mx-auto w-full max-w-xs"><JerseyArt primary={deal.team?.primary || '#2A3320'} secondary={deal.team?.secondary || '#C6F53F'} number="10" name="VOLT" view="back" /></div>
+          <div className="mx-auto w-full max-w-xs">
+            {deal.images?.[0] ? (
+              <img src={deal.images[0].url} alt={deal.name} className="w-full object-contain" />
+            ) : (
+              <div className="aspect-square bg-pitch2 flex items-center justify-center">
+                <span className="font-display text-4xl text-chalk/10">IMG</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </section>
   )
 }
-
-/* ---------------- Brand marquee ---------------- */
 
 function BrandStrip() {
   const brands = ['FLEETMART PRO', 'STRIKERX', 'VELOCITA', 'NORTHWALL', 'TITANGRIP']
@@ -245,8 +270,6 @@ function BrandStrip() {
     </section>
   )
 }
-
-/* ---------------- Stats count-up ---------------- */
 
 function CountUp({ to, suffix = '' }) {
   const [val, setVal] = useState(0)
@@ -294,8 +317,6 @@ function Stats() {
   )
 }
 
-/* ---------------- Testimonials ---------------- */
-
 const REVIEWS = [
   { name: 'Tanvir A.', role: 'Sunday League Captain', text: 'Ordered 14 customized jerseys for my team on Tuesday, wore them Saturday. The volt print on midnight navy is unreal in person.', rating: 5 },
   { name: 'Sadia R.', role: 'Turf Regular', text: 'The Academy Turf boots grip wet artificial grass better than boots triple the price. Fleetmart gets the Dhaka turf scene.', rating: 5 },
@@ -335,25 +356,30 @@ function Testimonials() {
   )
 }
 
-/* ---------------- Recently viewed ---------------- */
-
 function RecentlyViewed() {
   const recentIds = useSelector((s) => s.ui.recentlyViewed)
-  const viewed = recentIds.map((v) => PRODUCTS.find((p) => p.id === v.id)).filter(Boolean)
-  if (!viewed.length) return null
+  const [products, setProducts] = useState([])
+
+  useEffect(() => {
+    if (!recentIds.length) return
+    const slugs = recentIds.map(v => v.slug || v.id).filter(Boolean)
+    if (!slugs.length) return
+    Promise.all(slugs.map(slug => api.get(`/products/${slug}`).then(r => r.data.product).catch(() => null)))
+      .then(items => setProducts(items.filter(Boolean)))
+  }, [recentIds])
+
+  if (!products.length) return null
   return (
     <section className="container-fm py-16">
       <SectionHeading eyebrow="Pick up where you left off" title="Recently Viewed" />
       <div className="no-scrollbar flex gap-4 overflow-x-auto pb-2">
-        {viewed.map((p) => (
-          <div key={p.id} className="w-56 shrink-0"><ProductCard product={p} /></div>
+        {products.map((p) => (
+          <div key={p._id} className="w-56 shrink-0"><ProductCard product={p} /></div>
         ))}
       </div>
     </section>
   )
 }
-
-/* ---------------- Page ---------------- */
 
 export default function Home() {
   return (

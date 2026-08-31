@@ -22,3 +22,9 @@ npm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# MongoDB data
+server/data/
+
+# Uploads
+server/uploads/

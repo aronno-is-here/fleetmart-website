@@ -14,6 +14,7 @@ const productSchema = new mongoose.Schema({
   stock: { type: Map, of: Number, default: {} },
   rating: { type: Number, default: 0 },
   numReviews: { type: Number, default: 0 },
+  images: [{ url: String, alt: { type: String, default: '' } }],
   featured: { type: Boolean, default: false },
   isNew: { type: Boolean, default: false },
   customizable: { type: Boolean, default: false },

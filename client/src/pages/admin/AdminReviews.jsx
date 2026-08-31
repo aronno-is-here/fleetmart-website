@@ -17,7 +17,7 @@ export default function AdminReviews() {
   useEffect(() => { load() }, [])
 
   const toggleVisibility = async (id, isVisible) => {
-    await api.put(`/reviews/${id/}visibility`, { isVisible: !isVisible })
+    await api.put(`/reviews/${id}/visibility`, { isVisible: !isVisible })
     load()
   }
 

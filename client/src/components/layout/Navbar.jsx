@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { Search, ShoppingBag, Heart, Menu, X, User, Zap } from 'lucide-react'
-import { CATEGORIES, PRODUCTS } from '../../data/products'
+import { CATEGORIES } from '../../data/products'
 import { cartCount } from '../../features/cartSlice'
 import { setCartOpen, setSearchOpen, setMobileNavOpen } from '../../features/uiSlice'
 import Ticker from './Ticker'
+import api from '../../lib/api'
 
 function Logo() {
   return (
@@ -32,6 +33,7 @@ export default function Navbar() {
   const mobileOpen = useSelector((s) => s.ui.mobileNavOpen)
   const [scrolled, setScrolled] = useState(false)
   const [megaOpen, setMegaOpen] = useState(false)
+  const [catCounts, setCatCounts] = useState({})
   const location = useLocation()
 
   useEffect(() => {
@@ -44,6 +46,18 @@ export default function Navbar() {
     dispatch(setMobileNavOpen(false))
     setMegaOpen(false)
   }, [location.pathname, location.search, dispatch])
+
+  useEffect(() => {
+    if (!megaOpen) return
+    api.get('/products', { params: { limit: 200 } }).then(({ data }) => {
+      const counts = {}
+      CATEGORIES.forEach(c => { counts[c.id] = 0 })
+      data.products.forEach(p => {
+        if (counts[p.category] !== undefined) counts[p.category]++
+      })
+      setCatCounts(counts)
+    }).catch(() => {})
+  }, [megaOpen])
 
   const linkCls = ({ isActive }) =>
     `font-head text-sm font-medium uppercase tracking-[0.18em] transition-colors ${
@@ -104,20 +118,17 @@ export default function Navbar() {
               <Link to="/shop" className="font-head text-xs font-semibold uppercase tracking-widest text-volt hover:underline">Open Catalog →</Link>
             </div>
             <div className="grid grid-cols-4 gap-3">
-              {CATEGORIES.map((c) => {
-                const count = PRODUCTS.filter((p) => p.category === c.id).length
-                return (
-                  <Link key={c.id} to={`/shop?category=${c.id}`} className="group flex items-center justify-between border border-line bg-pitch px-5 py-4 transition-colors hover:border-volt/50 hover:bg-pitch2">
-                    <div>
-                      <p className="font-display text-2xl uppercase tracking-wide text-chalk group-hover:text-volt">{c.name}</p>
-                      <p className="text-[11px] uppercase tracking-widest text-muted">{c.blurb}</p>
-                    </div>
-                    <span className="flex items-center gap-2 font-head text-xs uppercase tracking-widest text-muted group-hover:text-volt">
-                      {count} items <span className="transition-transform duration-200 group-hover:translate-x-1">→</span>
-                    </span>
-                  </Link>
-                )
-              })}
+              {CATEGORIES.map((c) => (
+                <Link key={c.id} to={`/shop?category=${c.id}`} className="group flex items-center justify-between border border-line bg-pitch px-5 py-4 transition-colors hover:border-volt/50 hover:bg-pitch2">
+                  <div>
+                    <p className="font-display text-2xl uppercase tracking-wide text-chalk group-hover:text-volt">{c.name}</p>
+                    <p className="text-[11px] uppercase tracking-widest text-muted">{c.blurb}</p>
+                  </div>
+                  <span className="flex items-center gap-2 font-head text-xs uppercase tracking-widest text-muted group-hover:text-volt">
+                    {catCounts[c.id] || 0} items <span className="transition-transform duration-200 group-hover:translate-x-1">→</span>
+                  </span>
+                </Link>
+              ))}
             </div>
             <div className="mt-4 flex items-center justify-between border border-volt/30 bg-gradient-to-r from-pitch to-pitch2 px-6 py-4">
               <div>

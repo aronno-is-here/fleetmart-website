@@ -7,12 +7,13 @@ const router = Router()
 // GET /api/products — public, with filters
 router.get('/', async (req, res, next) => {
   try {
-    const { category, brand, team, minPrice, maxPrice, size, sort, search, page = 1, limit = 24 } = req.query
+    const { category, brand, team, minPrice, maxPrice, size, sort, search, featured, page = 1, limit = 24 } = req.query
     const filter = { isActive: true }
 
     if (category) filter.category = category
     if (brand) filter.brand = brand
     if (team) filter.team = team
+    if (featured === '1') filter.featured = true
     if (size) filter[`stock.${size}`] = { $gt: 0 }
     if (minPrice || maxPrice) {
       filter.price = {}
@@ -33,6 +34,7 @@ router.get('/', async (req, res, next) => {
     else if (sort === 'rating') sortObj = { rating: -1 }
     else if (sort === 'newest') sortObj = { createdAt: -1 }
     else if (sort === 'popular') sortObj = { numReviews: -1 }
+    else if (sort === 'featured') sortObj = { featured: -1, rating: -1 }
 
     const skip = (Number(page) - 1) * Number(limit)
     const [products, total] = await Promise.all([

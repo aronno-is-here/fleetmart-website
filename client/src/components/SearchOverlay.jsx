@@ -2,16 +2,17 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { Search, X, ArrowRight } from 'lucide-react'
-import { PRODUCTS, CATEGORIES } from '../data/products'
+import { CATEGORIES } from '../data/products'
 import { setSearchOpen } from '../features/uiSlice'
-import { ProductArt } from './ProductArt'
 import { fmt, discounted } from '../lib/format'
+import api from '../lib/api'
 
 export default function SearchOverlay() {
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const open = useSelector((s) => s.ui.searchOpen)
   const [q, setQ] = useState('')
+  const [results, setResults] = useState([])
   const inputRef = useRef(null)
 
   useEffect(() => {
@@ -28,17 +29,15 @@ export default function SearchOverlay() {
     return () => window.removeEventListener('keydown', onKey)
   }, [dispatch])
 
-  const results = useMemo(() => {
-    const term = q.trim().toLowerCase()
-    if (!term) return []
-    return PRODUCTS.filter(
-      (p) =>
-        p.name.toLowerCase().includes(term) ||
-        p.brand.toLowerCase().includes(term) ||
-        p.category.includes(term) ||
-        (p.team && p.team.toLowerCase().includes(term)) ||
-        (p.league && p.league.toLowerCase().includes(term))
-    ).slice(0, 6)
+  useEffect(() => {
+    const term = q.trim()
+    if (!term) { setResults([]); return }
+    const t = setTimeout(() => {
+      api.get('/products', { params: { search: term, limit: 6 } })
+        .then(({ data }) => setResults(data.products))
+        .catch(() => setResults([]))
+    }, 300)
+    return () => clearTimeout(t)
   }, [q])
 
   const go = (slug) => {
@@ -73,12 +72,18 @@ export default function SearchOverlay() {
           {results.length > 0 ? (
             <ul className="divide-y divide-line">
               {results.map((p) => (
-                <li key={p.id}>
+                <li key={p._id}>
                   <button onClick={() => go(p.slug)} className="group flex w-full items-center gap-4 px-5 py-3 text-left transition-colors hover:bg-pitch2">
-                    <span className="h-12 w-12 shrink-0 border border-line bg-night"><ProductArt product={p} /></span>
+                    <span className="h-12 w-12 shrink-0 border border-line bg-night flex items-center justify-center overflow-hidden">
+                      {p.images?.[0] ? (
+                        <img src={p.images[0].url} alt={p.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-xs text-muted font-head">IMG</span>
+                      )}
+                    </span>
                     <span className="flex-1">
                       <span className="block font-head text-sm font-semibold uppercase tracking-wide text-chalk group-hover:text-volt">{p.name}</span>
-                      <span className="text-xs uppercase tracking-widest text-muted">{p.brand} · {p.subCategory}</span>
+                      <span className="text-xs uppercase tracking-widest text-muted">{p.brand} · {p.category}</span>
                     </span>
                     <span className="font-head font-semibold text-chalk">{fmt(discounted(p))}</span>
                     <ArrowRight size={16} className="text-muted transition-transform group-hover:translate-x-1 group-hover:text-volt" />

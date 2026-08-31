@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { SlidersHorizontal, X } from 'lucide-react'
-import { PRODUCTS, CATEGORIES, BRANDS, TEAMS, SIZES, BOOT_SIZES } from '../data/products'
+import { CATEGORIES, BRANDS, TEAMS, SIZES, BOOT_SIZES } from '../data/products'
 import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
-import { fmt, totalStock } from '../lib/format'
+import { fmt } from '../lib/format'
+import api from '../lib/api'
 
 const SORTS = [
   { id: 'featured', label: 'Featured' },
   { id: 'newest', label: 'Newest' },
-  { id: 'price-asc', label: 'Price: Low → High' },
-  { id: 'price-desc', label: 'Price: High → Low' },
+  { id: 'price_asc', label: 'Price: Low → High' },
+  { id: 'price_desc', label: 'Price: High → Low' },
   { id: 'rating', label: 'Top Rated' },
+  { id: 'popular', label: 'Popular' },
 ]
 
 function FilterGroup({ title, children, defaultOpen = true }) {
@@ -39,6 +41,8 @@ function CheckRow({ checked, onChange, label, hint }) {
 export default function Shop() {
   const [params, setParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
+  const [products, setProducts] = useState([])
+  const [total, setTotal] = useState(0)
   const [filtersOpen, setFiltersOpen] = useState(false)
 
   const cat = params.get('category') || ''
@@ -52,9 +56,25 @@ export default function Shop() {
 
   useEffect(() => {
     setLoading(true)
-    const id = setTimeout(() => setLoading(false), 450)
-    return () => clearTimeout(id)
-  }, [params])
+    const apiParams = { limit: 50 }
+    if (cat) apiParams.category = cat
+    if (brand) apiParams.brand = brand
+    if (team) apiParams.team = team
+    if (size) apiParams.size = size
+    if (maxPrice < 13000) apiParams.maxPrice = maxPrice
+    if (sort) apiParams.sort = sort
+    if (q) apiParams.search = q
+
+    api.get('/products', { params: apiParams })
+      .then(({ data }) => {
+        let list = data.products
+        if (customizable) list = list.filter(p => p.customizable)
+        setProducts(list)
+        setTotal(list.length)
+      })
+      .catch(() => { setProducts([]); setTotal(0) })
+      .finally(() => setLoading(false))
+  }, [cat, brand, team, size, customizable, maxPrice, sort, q])
 
   const setParam = (key, val) => {
     const next = new URLSearchParams(params)
@@ -62,27 +82,6 @@ export default function Shop() {
     else next.delete(key)
     setParams(next, { replace: true })
   }
-
-  const results = useMemo(() => {
-    let list = PRODUCTS.filter((p) => {
-      if (cat && p.category !== cat) return false
-      if (brand && p.brand !== brand) return false
-      if (team && p.team !== team) return false
-      if (customizable && !p.customizable) return false
-      if (size && !p.sizes.includes(size)) return false
-      if (p.price > maxPrice) return false
-      if (q && !p.name.toLowerCase().includes(q.toLowerCase())) return false
-      return true
-    })
-    switch (sort) {
-      case 'price-asc': list = [...list].sort((a, b) => a.price - b.price); break
-      case 'price-desc': list = [...list].sort((a, b) => b.price - a.price); break
-      case 'rating': list = [...list].sort((a, b) => b.rating - a.rating); break
-      case 'newest': list = [...list].sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0)); break
-      default: list = [...list].sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0))
-    }
-    return list
-  }, [cat, brand, team, size, customizable, maxPrice, sort, q])
 
   const activeCat = CATEGORIES.find((c) => c.id === cat)
   const sizeOptions = cat === 'boots' ? BOOT_SIZES : [...new Set([...SIZES, ...BOOT_SIZES])]
@@ -148,7 +147,7 @@ export default function Shop() {
         <div>
           <p className="eyebrow mb-2">{q ? `Results for "${q}"` : 'Browse everything'}</p>
           <h1 className="font-display text-5xl uppercase tracking-wide text-chalk sm:text-6xl">{activeCat ? activeCat.name : 'Catalog'}</h1>
-          <p className="mt-2 text-sm text-muted">{results.length} products</p>
+          <p className="mt-2 text-sm text-muted">{total} products</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => setFiltersOpen(true)} className="btn-ghost !px-4 !py-2.5 !text-xs lg:hidden">
@@ -167,7 +166,6 @@ export default function Shop() {
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[240px_1fr]">
-        {/* Sidebar filters (desktop) */}
         <aside className="hidden self-start lg:sticky lg:top-32 lg:block">
           <div className="mb-4 flex items-center justify-between">
             <p className="font-head text-sm font-semibold uppercase tracking-[0.2em] text-chalk">Filters</p>
@@ -180,13 +178,12 @@ export default function Shop() {
           {filterPanel}
         </aside>
 
-        {/* Grid */}
         <div>
           {loading ? (
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
               {Array.from({ length: 9 }).map((_, i) => <ProductCardSkeleton key={i} />)}
             </div>
-          ) : results.length === 0 ? (
+          ) : products.length === 0 ? (
             <div className="grid place-items-center border border-dashed border-line py-24 text-center">
               <div>
                 <p className="font-display text-4xl uppercase tracking-wide text-muted">No gear found</p>
@@ -196,7 +193,7 @@ export default function Shop() {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-              {results.map((p) => <ProductCard key={p.id} product={p} hideArt />)}
+              {products.map((p) => <ProductCard key={p._id} product={p} hideArt />)}
             </div>
           )}
         </div>
@@ -211,7 +208,7 @@ export default function Shop() {
             <button onClick={() => setFiltersOpen(false)} aria-label="Close filters" className="text-muted hover:text-chalk"><X size={20} /></button>
           </div>
           {filterPanel}
-          <button onClick={() => setFiltersOpen(false)} className="btn-volt mt-6 w-full justify-center !text-xs">Show {results.length} Results</button>
+          <button onClick={() => setFiltersOpen(false)} className="btn-volt mt-6 w-full justify-center !text-xs">Show {total} Results</button>
         </div>
       </div>
     </div>

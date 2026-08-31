@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Plus, Pencil, Trash2, X } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
+import { Plus, Pencil, Trash2, X, Upload, Image } from 'lucide-react'
 import api from '../../lib/api'
 
 const fmt = (n) => `৳${Number(n).toLocaleString()}`
@@ -9,6 +9,7 @@ const empty = {
   team: '', league: '', price: '', discountPrice: '', stock: '{}',
   featured: false, isNew: false, customizable: false,
   artColors: { primary: '#C6F53F', secondary: '#0A0E13', accent: '#3FA9F5' },
+  images: [],
 }
 
 export default function AdminProducts() {
@@ -21,6 +22,8 @@ export default function AdminProducts() {
   const [form, setForm] = useState(empty)
   const [saving, setSaving] = useState(false)
   const [filter, setFilter] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef(null)
 
   const load = (p = 1) => {
     setLoading(true)
@@ -45,7 +48,29 @@ export default function AdminProducts() {
       price: String(p.price),
       discountPrice: p.discountPrice ? String(p.discountPrice) : '',
       stock: JSON.stringify(Object.fromEntries(Object.entries(p.stock || {}))),
+      images: p.images || [],
     })
+  }
+
+  const handleUpload = async (files) => {
+    if (!files.length) return
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      for (const f of files) fd.append('images', f)
+      const { data } = await api.post('/upload', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      setForm(prev => ({ ...prev, images: [...prev.images, ...data.files] }))
+    } catch (err) {
+      alert(err.response?.data?.message || 'Upload failed')
+    }
+    setUploading(false)
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  const removeImage = (idx) => {
+    setForm(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }))
   }
 
   const save = async (e) => {
@@ -89,7 +114,6 @@ export default function AdminProducts() {
         </button>
       </div>
 
-      {/* Filter */}
       <select value={filter} onChange={e => setFilter(e.target.value)} className="input-fm max-w-xs">
         <option value="">All Categories</option>
         <option value="jersey">Jerseys</option>
@@ -102,16 +126,15 @@ export default function AdminProducts() {
         <option value="merch">Fan Merch</option>
       </select>
 
-      {/* Table */}
       <div className="bg-pitch border border-line overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-line text-left">
               <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Product</th>
+              <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Image</th>
               <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Category</th>
               <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Price</th>
               <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Stock</th>
-              <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Status</th>
               <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Actions</th>
             </tr>
           </thead>
@@ -124,6 +147,15 @@ export default function AdminProducts() {
                     <div className="font-head text-chalk">{p.name}</div>
                     <div className="text-xs text-muted">{p.brand}</div>
                   </td>
+                  <td className="px-4 py-3">
+                    {p.images?.[0] ? (
+                      <img src={p.images[0].url} alt={p.name} className="w-12 h-12 object-cover rounded border border-line" />
+                    ) : (
+                      <div className="w-12 h-12 bg-pitch2 rounded border border-line flex items-center justify-center">
+                        <Image size={16} className="text-muted" />
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-muted capitalize">{p.category}</td>
                   <td className="px-4 py-3">
                     <span className="text-chalk">{fmt(p.price)}</span>
@@ -131,12 +163,6 @@ export default function AdminProducts() {
                   </td>
                   <td className="px-4 py-3">
                     <span className={`font-head ${totalStock < 10 ? 'text-ember' : 'text-muted'}`}>{totalStock}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1">
-                      {p.featured && <span className="text-[10px] font-head bg-volt/20 text-volt px-1.5 py-0.5 rounded">Featured</span>}
-                      {p.isNew && <span className="text-[10px] font-head bg-azure/20 text-azure px-1.5 py-0.5 rounded">New</span>}
-                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
@@ -151,7 +177,6 @@ export default function AdminProducts() {
         </table>
       </div>
 
-      {/* Pagination */}
       {pages > 1 && (
         <div className="flex gap-2">
           {Array.from({ length: pages }, (_, i) => i + 1).map(p => (
@@ -160,9 +185,8 @@ export default function AdminProducts() {
         </div>
       )}
 
-      {/* Edit Modal */}
       {editing && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center pt-20 overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center pt-10 overflow-y-auto">
           <div className="bg-pitch border border-line w-full max-w-2xl mx-4 mb-8">
             <div className="flex items-center justify-between px-6 py-4 border-b border-line">
               <h2 className="text-lg font-display tracking-wider text-chalk">
@@ -170,7 +194,29 @@ export default function AdminProducts() {
               </h2>
               <button onClick={() => setEditing(null)} className="text-muted hover:text-chalk"><X size={20} /></button>
             </div>
-            <form onSubmit={save} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+            <form onSubmit={save} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              {/* Images Section */}
+              <div>
+                <label className="block text-xs font-head text-muted uppercase tracking-widest mb-2">Product Images</label>
+                <div className="flex flex-wrap gap-3">
+                  {form.images.map((img, idx) => (
+                    <div key={idx} className="relative group">
+                      <img src={img.url} alt={img.alt} className="w-20 h-20 object-cover rounded border border-line" />
+                      <button type="button" onClick={() => removeImage(idx)}
+                        className="absolute -top-2 -right-2 bg-ember text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  <label className="w-20 h-20 border-2 border-dashed border-line rounded flex flex-col items-center justify-center cursor-pointer hover:border-volt transition-colors">
+                    <Upload size={16} className="text-muted" />
+                    <span className="text-[9px] text-muted mt-1">{uploading ? '...' : 'Add'}</span>
+                    <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
+                      onChange={e => handleUpload(e.target.files)} />
+                  </label>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1">Name</label>

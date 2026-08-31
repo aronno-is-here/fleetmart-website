@@ -5,6 +5,8 @@ import express from 'express'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
 import morgan from 'morgan'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import connectDB from './config/db.js'
 import { errorHandler } from './middleware/errorHandler.js'
 
@@ -15,7 +17,9 @@ import orderRoutes from './routes/orders.js'
 import reviewRoutes from './routes/reviews.js'
 import couponRoutes from './routes/coupons.js'
 import adminRoutes from './routes/admin.js'
+import uploadRoutes from './routes/upload.js'
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 const PORT = process.env.PORT || 5000
 
@@ -26,6 +30,7 @@ app.use(cors({
 }))
 app.use(express.json({ limit: '10mb' }))
 app.use(cookieParser())
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 if (process.env.NODE_ENV === 'development') app.use(morgan('dev'))
 
 // Routes
@@ -36,6 +41,7 @@ app.use('/api/orders', orderRoutes)
 app.use('/api/reviews', reviewRoutes)
 app.use('/api/coupons', couponRoutes)
 app.use('/api/admin', adminRoutes)
+app.use('/api/upload', uploadRoutes)
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
 

@@ -1,25 +1,20 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { motion } from 'framer-motion'
-import { ChevronRight, Minus, Plus, ShoppingBag, Heart, Zap, Truck, RefreshCcw, BadgeCheck, Ruler, Printer } from 'lucide-react'
-import { PRODUCTS, TEAMS, getProduct } from '../data/products'
-import { ProductArt, JerseyArt } from '../components/ProductArt'
-import ProductCard from '../components/ProductCard'
+import { ChevronRight, Minus, Plus, ShoppingBag, Heart, Truck, RefreshCcw, BadgeCheck, Ruler, Printer } from 'lucide-react'
+import { TEAMS } from '../data/products'
+import { ProductArt } from '../components/ProductArt'
+import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
 import Rating from '../components/ui/Rating'
 import SectionHeading from '../components/ui/SectionHeading'
 import { fmt, discounted, discountPct } from '../lib/format'
 import { addToCart } from '../features/cartSlice'
 import { toggleWishlist, inWishlist } from '../features/wishlistSlice'
-import { setCartOpen, toast, pushRecentlyViewed, toggleCompare } from '../features/uiSlice'
+import { setCartOpen, toast, pushRecentlyViewed } from '../features/uiSlice'
+import api from '../lib/api'
 
 const CUSTOM_FEE = 150
-
-const MOCK_REVIEWS = [
-  { name: 'Mahin S.', rating: 5, date: '2 weeks ago', text: 'Fabric quality is top tier, print is crisp and did not fade after 5 washes.' },
-  { name: 'Nabil K.', rating: 4, date: '1 month ago', text: 'Fit is slightly athletic — size up if you like it loose. Otherwise perfect.' },
-  { name: 'Ishrat J.', rating: 5, date: '2 months ago', text: 'Delivery to Chattogram took 2 days. Packaging felt like unboxing a bootleg-free original.' },
-]
 
 function Accordion({ title, icon, children, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen)
@@ -37,8 +32,11 @@ function Accordion({ title, icon, children, defaultOpen = false }) {
 export default function ProductDetails() {
   const { slug } = useParams()
   const dispatch = useDispatch()
-  const product = getProduct(slug)
-  const wished = useSelector(inWishlist(product?.id))
+  const [product, setProduct] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [reviews, setReviews] = useState([])
+  const [related, setRelated] = useState([])
+  const wished = useSelector(inWishlist(product?._id))
 
   const [view, setView] = useState('front')
   const [size, setSize] = useState(null)
@@ -46,18 +44,51 @@ export default function ProductDetails() {
   const [custom, setCustom] = useState({ name: '', number: '' })
 
   useEffect(() => {
+    setLoading(true)
+    setProduct(null)
+    setReviews([])
+    setRelated([])
     setView('front')
     setSize(null)
     setQty(1)
     setCustom({ name: '', number: '' })
-    if (product) dispatch(pushRecentlyViewed({ id: product.id }))
     window.scrollTo(0, 0)
-  }, [slug, dispatch, product])
 
-  const related = useMemo(
-    () => PRODUCTS.filter((p) => p.id !== product?.id && p.category === product?.category).slice(0, 4),
-    [product]
-  )
+    api.get(`/products/${slug}`)
+      .then(({ data }) => {
+        setProduct(data.product)
+        dispatch(pushRecentlyViewed({ id: data.product._id, slug: data.product.slug }))
+        return api.get('/products', { params: { category: data.product.category, limit: 4 } })
+      })
+      .then(({ data }) => {
+        setRelated(data.products.filter(p => p.slug !== slug).slice(0, 4))
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [slug, dispatch])
+
+  useEffect(() => {
+    if (!product) return
+    api.get(`/reviews/${product._id}`)
+      .then(({ data }) => setReviews(data.reviews || []))
+      .catch(() => {})
+  }, [product])
+
+  if (loading) {
+    return (
+      <div className="container-fm py-20">
+        <div className="grid gap-10 lg:grid-cols-2">
+          <div className="aspect-square bg-pitch border border-line animate-pulse" />
+          <div className="space-y-4">
+            <div className="skeleton h-4 w-1/3" />
+            <div className="skeleton h-10 w-2/3" />
+            <div className="skeleton h-6 w-1/4" />
+            <div className="skeleton h-20 w-full" />
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (!product) {
     return (
@@ -97,7 +128,7 @@ export default function ProductDetails() {
     }
     dispatch(
       addToCart({
-        id: product.id, slug: product.slug, name: product.name,
+        id: product._id, slug: product.slug, name: product.name,
         price: unitPrice, art: product.artColors || null, size: chosen, qty,
         customization: isCustomizing ? { name: custom.name.toUpperCase().slice(0, 12), number: custom.number.slice(0, 2) } : null,
       })
@@ -113,12 +144,11 @@ export default function ProductDetails() {
 
   return (
     <div className="pb-20">
-      {/* breadcrumb */}
       <div className="border-b border-line bg-pitch/40">
         <div className="container-fm flex items-center gap-2 py-3 text-xs uppercase tracking-widest text-muted">
           <Link to="/" className="hover:text-volt">Home</Link>
           <ChevronRight size={12} />
-          <Link to={`/shop?category=${product.category}`} className="hover:text-volt">{product.subCategory}</Link>
+          <Link to={`/shop?category=${product.category}`} className="hover:text-volt">{product.category}</Link>
           <ChevronRight size={12} />
           <span className="text-chalk">{product.name}</span>
         </div>
@@ -134,35 +164,43 @@ export default function ProductDetails() {
             className="relative aspect-square cursor-pointer overflow-hidden border border-line bg-night"
             onClick={() => setView(view === 'front' ? 'back' : 'front')}
           >
-            <ProductArt product={product} view={view} custom={product.category === 'jersey' ? jerseyCustom : artCustom} />
+            {product.images?.length > 0 ? (
+              <img src={product.images[0].url} alt={product.name} className="w-full h-full object-contain" />
+            ) : (
+              <ProductArt product={product} view={view} custom={product.category === 'jersey' ? jerseyCustom : artCustom} />
+            )}
             <div className="absolute left-3 top-3 flex flex-col gap-1.5">
               {pct > 0 && <span className="bg-ember px-2 py-1 font-head text-xs font-semibold uppercase tracking-widest text-white">-{pct}%</span>}
               {product.isNew && <span className="bg-volt px-2 py-1 font-head text-xs font-semibold uppercase tracking-widest text-night">New</span>}
             </div>
-            <span className="absolute bottom-3 left-1/2 -translate-x-1/2 border border-line bg-night/80 px-3 py-1 text-[10px] uppercase tracking-widest text-muted backdrop-blur">
-              Tap to flip · {view}
-            </span>
+            {product.images?.length > 1 && (
+              <span className="absolute bottom-3 left-1/2 -translate-x-1/2 border border-line bg-night/80 px-3 py-1 text-[10px] uppercase tracking-widest text-muted backdrop-blur">
+                Tap to flip · {view}
+              </span>
+            )}
           </motion.div>
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            {['front', 'back'].map((v) => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                className={`aspect-[16/10] border bg-night transition-colors ${view === v ? 'border-volt' : 'border-line hover:border-volt/50'}`}
-              >
-                <ProductArt product={product} view={v} custom={product.category === 'jersey' ? jerseyCustom : artCustom} />
-              </button>
-            ))}
-          </div>
+          {product.images?.length > 1 && (
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              {product.images.map((img, i) => (
+                <button
+                  key={i}
+                  onClick={() => setView(i === 0 ? 'front' : 'back')}
+                  className={`aspect-[16/10] border bg-night transition-colors overflow-hidden ${view === (i === 0 ? 'front' : 'back') ? 'border-volt' : 'border-line hover:border-volt/50'}`}
+                >
+                  <img src={img.url} alt={img.alt} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Info */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-          <p className="eyebrow mb-2">{product.brand} · {product.league || product.subCategory}</p>
+          <p className="eyebrow mb-2">{product.brand} · {product.category}</p>
           <h1 className="font-display text-5xl uppercase leading-none tracking-wide text-chalk">{product.name}</h1>
           <div className="mt-3 flex items-center gap-4">
             <Rating value={product.rating} count={product.numReviews} />
-            {product.team && <span className="border border-line px-2 py-0.5 text-[11px] uppercase tracking-widest text-muted">{TEAMS[product.team]?.name}</span>}
+            {product.team && TEAMS[product.team] && <span className="border border-line px-2 py-0.5 text-[11px] uppercase tracking-widest text-muted">{TEAMS[product.team].name}</span>}
           </div>
 
           <div className="mt-5 flex items-baseline gap-3">
@@ -200,7 +238,7 @@ export default function ProductDetails() {
                 </button>
               ))}
             </div>
-            {size && sizeStock <= 4 && (
+            {size && sizeStock != null && sizeStock <= 4 && (
               <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-ember">
                 <span className="h-1.5 w-1.5 animate-pulseDot rounded-full bg-ember" /> Hurry — only {sizeStock} left in {size}
               </p>
@@ -252,7 +290,7 @@ export default function ProductDetails() {
             <button onClick={() => addNow(true)} className="btn-ghost !py-3.5">Buy Now</button>
             <button
               onClick={() => {
-                dispatch(toggleWishlist({ id: product.id, slug: product.slug, name: product.name }))
+                dispatch(toggleWishlist({ id: product._id, slug: product.slug, name: product.name }))
                 dispatch(toast({ type: 'wishlist', message: wished ? 'Removed from wishlist' : 'Saved to wishlist' }))
               }}
               aria-label="Wishlist"
@@ -275,7 +313,7 @@ export default function ProductDetails() {
 
           <div className="mt-6">
             <Accordion title="Details & Fabric" defaultOpen>
-              {product.description} AeroDry breathable weave, reinforced double-stitched hems, and colour-locked dyes tested for 50+ washes.
+              {product.description}
             </Accordion>
             <Accordion title="Size Chart">
               <div className="overflow-hidden border border-line">
@@ -310,32 +348,38 @@ export default function ProductDetails() {
             </div>
           </div>
           <ul className="space-y-4">
-            {MOCK_REVIEWS.map((r) => (
-              <li key={r.name} className="border border-line bg-pitch p-5">
-                <div className="flex items-center justify-between">
-                  <p className="flex items-center gap-3">
-                    <span className="grid h-9 w-9 place-items-center bg-volt/15 font-display text-volt">{r.name[0]}</span>
-                    <span>
-                      <span className="block font-head text-sm font-semibold uppercase tracking-wide text-chalk">{r.name}</span>
-                      <span className="text-xs text-muted">{r.date}</span>
-                    </span>
-                  </p>
-                  <Rating value={r.rating} size={13} showValue={false} />
-                </div>
-                <p className="mt-3 text-sm leading-relaxed text-muted">{r.text}</p>
-              </li>
-            ))}
+            {reviews.length === 0 ? (
+              <li className="border border-dashed border-line bg-pitch p-8 text-center text-sm text-muted">No reviews yet — be the first to review this product.</li>
+            ) : (
+              reviews.map((r) => (
+                <li key={r._id} className="border border-line bg-pitch p-5">
+                  <div className="flex items-center justify-between">
+                    <p className="flex items-center gap-3">
+                      <span className="grid h-9 w-9 place-items-center bg-volt/15 font-display text-volt">{r.user?.name?.[0] || '?'}</span>
+                      <span>
+                        <span className="block font-head text-sm font-semibold uppercase tracking-wide text-chalk">{r.user?.name || 'Anonymous'}</span>
+                        <span className="text-xs text-muted">{new Date(r.createdAt).toLocaleDateString()}</span>
+                      </span>
+                    </p>
+                    <Rating value={r.rating} size={13} showValue={false} />
+                  </div>
+                  <p className="mt-3 text-sm leading-relaxed text-muted">{r.comment}</p>
+                </li>
+              ))
+            )}
           </ul>
         </div>
       </section>
 
       {/* Related */}
-      <section className="container-fm py-14">
-        <SectionHeading eyebrow="Complete the kit" title="You Might Also Like" action="Shop all" to="/shop" />
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          {related.map((p) => <ProductCard key={p.id} product={p} />)}
-        </div>
-      </section>
+      {related.length > 0 && (
+        <section className="container-fm py-14">
+          <SectionHeading eyebrow="Complete the kit" title="You Might Also Like" action="Shop all" to="/shop" />
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            {related.map((p) => <ProductCard key={p._id} product={p} />)}
+          </div>
+        </section>
+      )}
     </div>
   )
 }
