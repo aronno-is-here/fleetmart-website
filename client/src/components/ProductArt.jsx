@@ -290,6 +290,11 @@ const REGISTRY = {
   merch: ScarfArt,
 }
 
+/** Studio backdrop only — no product silhouette (used on catalog listings). */
+export function StudioArt() {
+  return <Studio>{null}</Studio>
+}
+
 const SUB_ART = {
   'Ladders': LadderArt,
   'Bibs': BibArt,

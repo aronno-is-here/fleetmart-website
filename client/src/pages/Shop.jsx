@@ -146,8 +146,8 @@ export default function Shop() {
     <div className="container-fm py-10">
       <div className="mb-8 flex items-end justify-between">
         <div>
-          <p className="eyebrow mb-2">{q ? `Results for "${q}"` : 'Store'}</p>
-          <h1 className="font-display text-5xl uppercase tracking-wide text-chalk sm:text-6xl">{activeCat ? activeCat.name : 'All Gear'}</h1>
+          <p className="eyebrow mb-2">{q ? `Results for "${q}"` : 'Browse everything'}</p>
+          <h1 className="font-display text-5xl uppercase tracking-wide text-chalk sm:text-6xl">{activeCat ? activeCat.name : 'Catalog'}</h1>
           <p className="mt-2 text-sm text-muted">{results.length} products</p>
         </div>
         <div className="flex items-center gap-3">
@@ -196,7 +196,7 @@ export default function Shop() {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-              {results.map((p) => <ProductCard key={p.id} product={p} />)}
+              {results.map((p) => <ProductCard key={p.id} product={p} hideArt />)}
             </div>
           )}
         </div>

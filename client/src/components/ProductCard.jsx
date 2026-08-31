@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { Heart, Eye, ShoppingBag } from 'lucide-react'
-import { ProductArt } from './ProductArt'
+import { ProductArt, StudioArt } from './ProductArt'
 import Rating from './ui/Rating'
 import { fmt, discounted, discountPct, totalStock } from '../lib/format'
 import { addToCart } from '../features/cartSlice'
@@ -21,13 +21,14 @@ export function ProductCardSkeleton() {
   )
 }
 
-export default function ProductCard({ product }) {
+export default function ProductCard({ product, hideArt = false }) {
   const dispatch = useDispatch()
   const wished = useSelector(inWishlist(product.id))
   const price = discounted(product)
   const pct = discountPct(product)
   const stock = totalStock(product)
   const lowStock = stock > 0 && stock <= 12
+  const blankArt = hideArt && product.category === 'jersey'
 
   const defaultSize = () => {
     const order = ['M', 'L', 'S', 'XL', 'XXL']
@@ -63,10 +64,10 @@ export default function ProductCard({ product }) {
     <Link to={`/product/${product.slug}`} className="card group relative block overflow-hidden transition-all duration-200 hover:border-volt/40 hover:shadow-card">
       <div className="relative aspect-square overflow-hidden bg-night">
         <div className="h-full w-full transition-transform duration-300 group-hover:scale-[1.04]">
-          <ProductArt product={product} view="front" />
+          {blankArt ? <StudioArt /> : <ProductArt product={product} view="front" />}
         </div>
         <div className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-          <ProductArt product={product} view={product.category === 'jersey' ? 'back' : 'front'} />
+          {blankArt ? <StudioArt /> : <ProductArt product={product} view={product.category === 'jersey' ? 'back' : 'front'} />}
         </div>
 
         <div className="absolute left-3 top-3 flex flex-col gap-1.5">

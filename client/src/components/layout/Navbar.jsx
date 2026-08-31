@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { Search, ShoppingBag, Heart, Menu, X, User, Zap } from 'lucide-react'
-import { CATEGORIES } from '../../data/products'
+import { CATEGORIES, PRODUCTS } from '../../data/products'
 import { cartCount } from '../../features/cartSlice'
 import { setCartOpen, setSearchOpen, setMobileNavOpen } from '../../features/uiSlice'
 import Ticker from './Ticker'
@@ -21,10 +21,7 @@ function Logo() {
 }
 
 const NAV = [
-  { to: '/shop', label: 'Shop All' },
-  { to: '/shop?category=jersey', label: 'Jerseys', mega: true },
-  { to: '/shop?category=boots', label: 'Boots' },
-  { to: '/shop?category=turf', label: 'Turf' },
+  { to: '/shop', label: 'Catalog', mega: true },
   { to: '/about', label: 'About' },
 ]
 
@@ -56,7 +53,7 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-50">
       <Ticker />
-      <div className={`border-b border-line bg-night/90 backdrop-blur transition-shadow ${scrolled ? 'shadow-card' : ''}`}>
+      <div className={`relative border-b border-line bg-night/90 backdrop-blur transition-shadow ${scrolled ? 'shadow-card' : ''}`} onMouseLeave={() => setMegaOpen(false)}>
         <div className="container-fm flex h-16 items-center justify-between gap-4">
           <div className="flex items-center gap-6">
             <button className="text-chalk lg:hidden" onClick={() => dispatch(setMobileNavOpen(!mobileOpen))} aria-label="Menu">
@@ -65,7 +62,7 @@ export default function Navbar() {
             <Logo />
           </div>
 
-          <nav className="hidden items-center gap-8 lg:flex" onMouseLeave={() => setMegaOpen(false)}>
+          <nav className="hidden items-center gap-8 lg:flex">
             {NAV.map((item) => (
               <div key={item.label} onMouseEnter={() => setMegaOpen(!!item.mega)}>
                 <NavLink to={item.to} className={linkCls}>{item.label}</NavLink>
@@ -95,20 +92,34 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* Mega menu */}
+        {/* Catalog mega menu */}
         <div
           className={`absolute inset-x-0 top-full hidden overflow-hidden border-b border-line bg-night/95 backdrop-blur transition-all duration-200 lg:block ${
-            megaOpen ? 'max-h-96 opacity-100' : 'pointer-events-none max-h-0 opacity-0'
+            megaOpen ? 'max-h-[560px] opacity-100' : 'pointer-events-none max-h-0 opacity-0'
           }`}
         >
-          <div className="container-fm grid grid-cols-4 gap-8 py-8">
-            {CATEGORIES.slice(0, 4).map((c) => (
-              <Link key={c.id} to={`/shop?category=${c.id}`} className="group border border-line bg-pitch p-5 transition-colors hover:border-volt/50">
-                <p className="font-display text-2xl uppercase tracking-wide text-chalk group-hover:text-volt">{c.name}</p>
-                <p className="mt-1 text-xs uppercase tracking-widest text-muted">{c.blurb}</p>
-              </Link>
-            ))}
-            <div className="col-span-4 flex items-center justify-between border border-volt/30 bg-gradient-to-r from-pitch to-pitch2 px-6 py-4">
+          <div className="container-fm py-8">
+            <div className="mb-5 flex items-center justify-between">
+              <p className="eyebrow">Browse the full collection</p>
+              <Link to="/shop" className="font-head text-xs font-semibold uppercase tracking-widest text-volt hover:underline">Open Catalog →</Link>
+            </div>
+            <div className="grid grid-cols-4 gap-3">
+              {CATEGORIES.map((c) => {
+                const count = PRODUCTS.filter((p) => p.category === c.id).length
+                return (
+                  <Link key={c.id} to={`/shop?category=${c.id}`} className="group flex items-center justify-between border border-line bg-pitch px-5 py-4 transition-colors hover:border-volt/50 hover:bg-pitch2">
+                    <div>
+                      <p className="font-display text-2xl uppercase tracking-wide text-chalk group-hover:text-volt">{c.name}</p>
+                      <p className="text-[11px] uppercase tracking-widest text-muted">{c.blurb}</p>
+                    </div>
+                    <span className="flex items-center gap-2 font-head text-xs uppercase tracking-widest text-muted group-hover:text-volt">
+                      {count} items <span className="transition-transform duration-200 group-hover:translate-x-1">→</span>
+                    </span>
+                  </Link>
+                )
+              })}
+            </div>
+            <div className="mt-4 flex items-center justify-between border border-volt/30 bg-gradient-to-r from-pitch to-pitch2 px-6 py-4">
               <div>
                 <p className="font-display text-2xl uppercase tracking-wide text-volt">Kit Builder</p>
                 <p className="text-xs uppercase tracking-widest text-muted">Print your name & number on any jersey — live preview</p>
