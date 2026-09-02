@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
-import { Search, ShoppingBag, Heart, Menu, X, User, Zap } from 'lucide-react'
+import { Search, ShoppingBag, Heart, Menu, X, User, Zap, Sun, Moon } from 'lucide-react'
 import { CATEGORIES } from '../../data/products'
 import { cartCount } from '../../features/cartSlice'
 import { setCartOpen, setSearchOpen, setMobileNavOpen } from '../../features/uiSlice'
+import { useTheme } from '../../contexts/ThemeContext'
 import Ticker from './Ticker'
 import api from '../../lib/api'
 
@@ -14,7 +15,7 @@ function Logo() {
       <span className="grid h-8 w-8 place-items-center bg-volt">
         <Zap size={18} className="fill-night text-night" />
       </span>
-      <span className="font-display text-3xl tracking-wider text-chalk">
+      <span className="font-display text-3xl tracking-wider text-chalk dark:text-chalk text-gray-900">
         FLEET<span className="text-volt">MART</span>
       </span>
     </Link>
@@ -28,6 +29,7 @@ const NAV = [
 
 export default function Navbar() {
   const dispatch = useDispatch()
+  const { theme, toggleTheme } = useTheme()
   const count = useSelector(cartCount)
   const wishCount = useSelector((s) => s.wishlist.length)
   const mobileOpen = useSelector((s) => s.ui.mobileNavOpen)
@@ -61,13 +63,13 @@ export default function Navbar() {
 
   const linkCls = ({ isActive }) =>
     `font-head text-sm font-medium uppercase tracking-[0.18em] transition-colors ${
-      isActive ? 'text-volt' : 'text-chalk/85 hover:text-volt'
+      isActive ? 'text-volt' : 'text-chalk/85 dark:text-chalk/85 text-gray-700 hover:text-volt'
     }`
 
   return (
     <header className="sticky top-0 z-50">
       <Ticker />
-      <div className={`relative border-b border-line bg-night/90 backdrop-blur transition-shadow ${scrolled ? 'shadow-card' : ''}`} onMouseLeave={() => setMegaOpen(false)}>
+      <div className={`relative border-b border-line bg-night/90 dark:bg-night/90 bg-white/90 backdrop-blur transition-shadow ${scrolled ? 'shadow-card dark:shadow-card' : ''}`} onMouseLeave={() => setMegaOpen(false)}>
         <div className="container-fm flex h-16 items-center justify-between gap-4">
           <div className="flex items-center gap-6">
             <button className="text-chalk lg:hidden" onClick={() => dispatch(setMobileNavOpen(!mobileOpen))} aria-label="Menu">
@@ -85,6 +87,9 @@ export default function Navbar() {
           </nav>
 
           <div className="flex items-center gap-1.5">
+            <button onClick={toggleTheme} aria-label="Toggle theme" className="grid h-10 w-10 place-items-center text-chalk/85 transition-colors hover:text-volt">
+              {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
             <button onClick={() => dispatch(setSearchOpen(true))} aria-label="Search" className="grid h-10 w-10 place-items-center text-chalk/85 transition-colors hover:text-volt">
               <Search size={20} />
             </button>
@@ -108,7 +113,7 @@ export default function Navbar() {
 
         {/* Catalog mega menu */}
         <div
-          className={`absolute inset-x-0 top-full hidden overflow-hidden border-b border-line bg-night/95 backdrop-blur transition-all duration-200 lg:block ${
+          className={`absolute inset-x-0 top-full hidden overflow-hidden border-b border-line bg-night/95 dark:bg-night/95 bg-white/95 backdrop-blur transition-all duration-200 lg:block ${
             megaOpen ? 'max-h-[560px] opacity-100' : 'pointer-events-none max-h-0 opacity-0'
           }`}
         >
@@ -119,7 +124,7 @@ export default function Navbar() {
             </div>
             <div className="grid grid-cols-4 gap-3">
               {CATEGORIES.map((c) => (
-                <Link key={c.id} to={`/shop?category=${c.id}`} className="group flex items-center justify-between border border-line bg-pitch px-5 py-4 transition-colors hover:border-volt/50 hover:bg-pitch2">
+                <Link key={c.id} to={`/shop?category=${c.id}`} className="group flex items-center justify-between border border-line bg-pitch dark:bg-pitch bg-gray-50 px-5 py-4 transition-colors hover:border-volt/50 hover:bg-pitch2 dark:hover:bg-pitch2 hover:bg-gray-100">
                   <div>
                     <p className="font-display text-2xl uppercase tracking-wide text-chalk group-hover:text-volt">{c.name}</p>
                     <p className="text-[11px] uppercase tracking-widest text-muted">{c.blurb}</p>
@@ -130,7 +135,7 @@ export default function Navbar() {
                 </Link>
               ))}
             </div>
-            <div className="mt-4 flex items-center justify-between border border-volt/30 bg-gradient-to-r from-pitch to-pitch2 px-6 py-4">
+            <div className="mt-4 flex items-center justify-between border border-volt/30 bg-gradient-to-r from-pitch to-pitch2 dark:from-pitch dark:to-pitch2 from-gray-50 to-gray-100 px-6 py-4">
               <div>
                 <p className="font-display text-2xl uppercase tracking-wide text-volt">Kit Builder</p>
                 <p className="text-xs uppercase tracking-widest text-muted">Print your name & number on any jersey — live preview</p>
@@ -142,10 +147,10 @@ export default function Navbar() {
       </div>
 
       {/* Mobile drawer */}
-      <div className={`fixed inset-0 top-[97px] z-40 bg-night/95 backdrop-blur transition-transform duration-250 lg:hidden ${mobileOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed inset-0 top-[97px] z-40 bg-night/95 dark:bg-night/95 bg-white/95 backdrop-blur transition-transform duration-250 lg:hidden ${mobileOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <nav className="container-fm flex flex-col gap-1 py-6">
           {CATEGORIES.map((c) => (
-            <Link key={c.id} to={`/shop?category=${c.id}`} className="flex items-center justify-between border-b border-line py-4 font-display text-2xl uppercase tracking-wide text-chalk">
+            <Link key={c.id} to={`/shop?category=${c.id}`} className="flex items-center justify-between border-b border-line py-4 font-display text-2xl uppercase tracking-wide text-chalk dark:text-chalk text-gray-900">
               {c.name} <span className="text-volt">→</span>
             </Link>
           ))}

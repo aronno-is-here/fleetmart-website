@@ -3,6 +3,10 @@ dotenv.config()
 
 import express from 'express'
 import cors from 'cors'
+import helmet from 'helmet'
+import compression from 'compression'
+import rateLimit from 'express-rate-limit'
+import mongoSanitize from 'express-mongo-sanitize'
 import cookieParser from 'cookie-parser'
 import morgan from 'morgan'
 import path from 'path'
@@ -23,18 +27,60 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 const PORT = process.env.PORT || 5000
 
-// Middleware
+const corsOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
+  : ['http://localhost:5173', 'http://localhost:3000']
+
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+}))
+
+// Compression
+app.use(compression())
+
+// CORS
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000'],
+  origin: corsOrigins,
   credentials: true,
 }))
+
+// Rate limiting
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { message: 'Too many attempts, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { message: 'Too many requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+// Body parsing
 app.use(express.json({ limit: '10mb' }))
 app.use(cookieParser())
+
+// NoSQL injection prevention
+app.use(mongoSanitize())
+
+// Static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
+
+// Logging
 if (process.env.NODE_ENV === 'development') app.use(morgan('dev'))
 
+// API rate limiter
+app.use('/api', apiLimiter)
+
 // Routes
-app.use('/api/auth', authRoutes)
+app.use('/api/auth', authLimiter, authRoutes)
 app.use('/api/products', productRoutes)
 app.use('/api/categories', categoryRoutes)
 app.use('/api/orders', orderRoutes)
@@ -45,8 +91,26 @@ app.use('/api/upload', uploadRoutes)
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
 
+// Serve React build in production
+if (process.env.NODE_ENV === 'production') {
+  const clientDist = path.join(__dirname, '..', 'client', 'dist')
+  app.use(express.static(clientDist))
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(clientDist, 'index.html'))
+  })
+}
+
 // Error handler
 app.use(errorHandler)
+
+// Process error handlers
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection:', reason)
+})
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err)
+})
 
 // Start
 connectDB().then(() => {

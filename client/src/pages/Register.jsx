@@ -1,14 +1,27 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AuthShell, AuthInput, useAuthSubmit } from './Login'
+import { AuthShell, AuthInput, PasswordInput, useAuthSubmit } from './Login'
 
 export default function Register() {
   const { form, setForm, submit, busy } = useAuthSubmit({ mode: 'register' })
+  const [confirm, setConfirm] = useState('')
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (form.password !== confirm) {
+      alert('Passwords do not match')
+      return
+    }
+    submit(e)
+  }
+
   return (
     <AuthShell title="Get In The Game" sub="Create your squad account — takes 30 seconds.">
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <AuthInput required placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <AuthInput type="email" required placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-        <AuthInput type="password" required minLength={6} placeholder="Password (min 8 chars)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+        <PasswordInput placeholder="Password (min 6 chars)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} minLength={6} />
+        <PasswordInput placeholder="Confirm password" value={confirm} onChange={(e) => setConfirm(e.target.value)} minLength={6} />
         <label className="flex items-start gap-2 text-xs text-muted">
           <input type="checkbox" required className="mt-0.5 accent-[#C6F53F]" />
           I agree to the Terms of Service and Privacy Policy

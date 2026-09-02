@@ -16,9 +16,9 @@ function ToastItem({ t }) {
     return () => clearTimeout(id)
   }, [t.id, dispatch])
   return (
-    <div className="pointer-events-auto flex items-center gap-3 border border-line bg-pitch2/95 px-4 py-3 shadow-card backdrop-blur">
+    <div className="pointer-events-auto flex items-center gap-3 border border-line bg-pitch2/95 dark:bg-pitch2/95 bg-white/95 px-4 py-3 shadow-card backdrop-blur">
       {ICONS[t.type] || ICONS.success}
-      <p className="text-sm text-chalk">{t.message}</p>
+      <p className="text-sm text-chalk dark:text-chalk text-gray-900">{t.message}</p>
       <button onClick={() => dispatch(dismissToast(t.id))} className="ml-2 text-muted hover:text-chalk" aria-label="Dismiss">
         <X size={14} />
       </button>

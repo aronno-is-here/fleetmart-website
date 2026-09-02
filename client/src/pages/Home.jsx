@@ -49,7 +49,7 @@ function Hero() {
 
   return (
     <section
-      className="relative overflow-hidden border-b border-line bg-night"
+      className="relative overflow-hidden border-b border-line bg-night dark:bg-night bg-white"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -140,12 +140,12 @@ function CategoryTiles() {
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {CATEGORIES.map((c, i) => (
           <motion.div key={c.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.05, duration: 0.4 }}>
-            <Link to={`/shop?category=${c.id}`} className="group relative block overflow-hidden border border-line bg-pitch transition-colors hover:border-volt/50">
-              <div className="aspect-[4/3] transition-transform duration-300 group-hover:scale-105 flex items-center justify-center bg-pitch2">
-                <span className="font-display text-4xl text-chalk/10 uppercase">{c.name.slice(0, 2)}</span>
+            <Link to={`/shop?category=${c.id}`} className="group relative block overflow-hidden border border-line bg-pitch dark:bg-pitch bg-gray-50 transition-colors hover:border-volt/50">
+              <div className="aspect-[4/3] transition-transform duration-300 group-hover:scale-105 flex items-center justify-center bg-pitch2 dark:bg-pitch2 bg-gray-100">
+                <span className="font-display text-4xl text-chalk/10 dark:text-chalk/10 text-gray-300 uppercase">{c.name.slice(0, 2)}</span>
               </div>
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-night via-night/70 to-transparent p-4 pt-10">
-                <p className="font-display text-2xl uppercase tracking-wide text-chalk group-hover:text-volt">{c.name}</p>
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-night dark:from-night from-white via-night/70 dark:via-night/70 via-white/70 to-transparent p-4 pt-10">
+                <p className="font-display text-2xl uppercase tracking-wide text-chalk dark:text-chalk text-gray-900 group-hover:text-volt">{c.name}</p>
                 <p className="text-[11px] uppercase tracking-widest text-muted">{counts[c.id] || 0} items</p>
               </div>
             </Link>
@@ -168,7 +168,7 @@ function Featured() {
   }, [])
 
   return (
-    <section className="border-y border-line bg-pitch/40 py-16">
+    <section className="border-y border-line bg-pitch/40 dark:bg-pitch/40 bg-gray-50 py-16">
       <div className="container-fm">
         <SectionHeading eyebrow="Crowd favourites" title="Featured Gear" action="Shop all" to="/shop" />
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -213,7 +213,7 @@ function FlashDeal() {
 
   return (
     <section className="container-fm py-16">
-      <div className="relative overflow-hidden border border-volt/30 bg-gradient-to-r from-pitch via-pitch2 to-pitch">
+      <div className="relative overflow-hidden border border-volt/30 bg-gradient-to-r from-pitch via-pitch2 to-pitch dark:from-pitch dark:via-pitch2 dark:to-pitch from-white via-gray-50 to-white">
         <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-volt/10 blur-3xl" />
         <div className="relative grid items-center gap-8 p-8 md:grid-cols-2 md:p-12">
           <div>
@@ -255,7 +255,7 @@ function FlashDeal() {
 function BrandStrip() {
   const brands = ['FLEETMART PRO', 'STRIKERX', 'VELOCITA', 'NORTHWALL', 'TITANGRIP']
   return (
-    <section className="overflow-hidden border-y border-line bg-pitch py-6">
+    <section className="overflow-hidden border-y border-line bg-pitch dark:bg-pitch bg-gray-50 py-6">
       <div className="flex w-max animate-marquee gap-16 whitespace-nowrap">
         {[0, 1].map((half) => (
           <div key={half} className="flex gap-16">
@@ -308,7 +308,7 @@ function Stats() {
   return (
     <section className="container-fm grid grid-cols-2 gap-4 py-16 md:grid-cols-4">
       {stats.map((st) => (
-        <div key={st.label} className="border border-line bg-pitch p-6 text-center">
+        <div key={st.label} className="border border-line bg-pitch dark:bg-pitch bg-gray-50 p-6 text-center">
           <p className="font-display text-5xl tracking-wide text-volt"><CountUp to={st.to} suffix={st.suffix} /></p>
           <p className="mt-1 font-head text-xs font-medium uppercase tracking-[0.25em] text-muted">{st.label}</p>
         </div>
@@ -325,7 +325,7 @@ const REVIEWS = [
 
 function Testimonials() {
   return (
-    <section className="border-y border-line bg-pitch/40 py-16">
+    <section className="border-y border-line bg-pitch/40 dark:bg-pitch/40 bg-gray-50 py-16">
       <div className="container-fm">
         <SectionHeading eyebrow="From the stands" title="What the Squad Says" />
         <div className="grid gap-4 md:grid-cols-3">
@@ -336,14 +336,14 @@ function Testimonials() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.1, duration: 0.4 }}
-              className="relative border border-line bg-pitch p-6"
+              className="relative border border-line bg-pitch dark:bg-pitch bg-gray-50 p-6"
             >
               <Quote size={28} className="absolute right-5 top-5 text-volt/20" />
-              <blockquote className="text-sm leading-relaxed text-chalk/90">"{r.text}"</blockquote>
+              <blockquote className="text-sm leading-relaxed text-chalk/90 dark:text-chalk/90 text-gray-600">"{r.text}"</blockquote>
               <figcaption className="mt-5 flex items-center gap-3">
                 <span className="grid h-10 w-10 place-items-center bg-volt/15 font-display text-lg text-volt">{r.name[0]}</span>
                 <span>
-                  <span className="block font-head text-sm font-semibold uppercase tracking-wide text-chalk">{r.name}</span>
+                  <span className="block font-head text-sm font-semibold uppercase tracking-wide text-chalk dark:text-chalk text-gray-900">{r.name}</span>
                   <span className="block text-xs text-muted">{r.role}</span>
                 </span>
                 <span className="ml-auto text-gold">{'★'.repeat(r.rating)}<span className="text-line">{'★'.repeat(5 - r.rating)}</span></span>

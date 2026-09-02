@@ -8,6 +8,7 @@ import Checkout from './pages/Checkout'
 import OrderSuccess from './pages/OrderSuccess'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import ForgotPassword from './pages/ForgotPassword'
 import Account from './pages/Account'
 import Wishlist from './pages/Wishlist'
 import About from './pages/About'
@@ -15,6 +16,7 @@ import Contact from './pages/Contact'
 import Faq from './pages/Faq'
 import Policy from './pages/Policy'
 import NotFound from './pages/NotFound'
+import ProtectedRoute from './components/ProtectedRoute'
 import AdminLayout from './pages/admin/AdminLayout'
 import AdminLogin from './pages/admin/AdminLogin'
 import Dashboard from './pages/admin/Dashboard'
@@ -32,12 +34,34 @@ const router = createBrowserRouter([
       { path: '/shop', element: <Shop /> },
       { path: '/product/:slug', element: <ProductDetails /> },
       { path: '/cart', element: <Cart /> },
-      { path: '/checkout', element: <Checkout /> },
+      {
+        path: '/checkout',
+        element: (
+          <ProtectedRoute>
+            <Checkout />
+          </ProtectedRoute>
+        ),
+      },
       { path: '/order/success', element: <OrderSuccess /> },
       { path: '/login', element: <Login /> },
       { path: '/register', element: <Register /> },
-      { path: '/account', element: <Account /> },
-      { path: '/account/:tab', element: <Account /> },
+      { path: '/forgot-password', element: <ForgotPassword /> },
+      {
+        path: '/account',
+        element: (
+          <ProtectedRoute>
+            <Account />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/account/:tab',
+        element: (
+          <ProtectedRoute>
+            <Account />
+          </ProtectedRoute>
+        ),
+      },
       { path: '/account/wishlist', element: <Wishlist /> },
       { path: '/about', element: <About /> },
       { path: '/contact', element: <Contact /> },

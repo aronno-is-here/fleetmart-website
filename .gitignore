@@ -5,7 +5,7 @@ node_modules/
 dist/
 build/
 
-# Env
+# Env (keep .env.example tracked)
 .env
 .env.local
 .env.*.local
@@ -28,3 +28,6 @@ server/data/
 
 # Uploads
 server/uploads/
+
+# Docker
+docker-compose.override.yml

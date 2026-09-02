@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import Order from '../models/Order.js'
+import Product from '../models/Product.js'
 import { protect, adminOnly } from '../middleware/auth.js'
 
 const router = Router()
@@ -7,26 +8,56 @@ const router = Router()
 // POST /api/orders — create order (auth)
 router.post('/', protect, async (req, res, next) => {
   try {
-    const { items, shippingAddress, paymentMethod, subtotal, shippingFee, discount, total, couponCode, note } = req.body
-    const orderId = `#FM-${Date.now().toString(36).toUpperCase()}`
+    const { items, shipping, paymentMethod, shippingMethod, couponCode, totals, note } = req.body
+
+    if (!items || items.length === 0) {
+      return res.status(400).json({ message: 'Order must contain at least one item' })
+    }
+
+    const orderId = `FM-${Date.now().toString(36).toUpperCase()}`
 
     const order = await Order.create({
       orderId,
       user: req.user._id,
-      items,
-      shippingAddress,
-      paymentMethod,
-      subtotal,
-      shippingFee,
-      discount,
-      total,
-      couponCode,
-      note,
+      items: items.map((i) => ({
+        product: i.product,
+        name: i.name,
+        size: i.size,
+        qty: i.qty,
+        price: i.price,
+        customization: i.artColors ? { name: i.artColors.name || '', number: i.artColors.number || '' } : undefined,
+      })),
+      shippingAddress: {
+        label: 'Delivery',
+        street: shipping?.street || '',
+        city: shipping?.city || '',
+        zip: shipping?.zip || '',
+        country: shipping?.country || 'Bangladesh',
+        phone: shipping?.phone || '',
+        name: shipping?.name || '',
+      },
+      paymentMethod: paymentMethod || 'cod',
+      subtotal: totals?.subtotal || 0,
+      shippingFee: totals?.shipping || 0,
+      discount: totals?.discount || 0,
+      total: totals?.grand || 0,
+      couponCode: couponCode || null,
+      note: note || '',
       statusHistory: [{ status: 'processing', timestamp: new Date() }],
       paymentStatus: paymentMethod === 'cod' ? 'pending' : 'pending',
     })
 
-    res.status(201).json({ order })
+    // Decrement stock for each item
+    for (const item of items) {
+      if (item.product && item.size) {
+        await Product.updateOne(
+          { _id: item.product, [`stock.${item.size}`]: { $gte: item.qty } },
+          { $inc: { [`stock.${item.size}`]: -item.qty } }
+        ).catch(() => {})
+      }
+    }
+
+    res.status(201).json({ order, orderId: order.orderId })
   } catch (err) { next(err) }
 })
 

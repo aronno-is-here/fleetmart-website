@@ -4,10 +4,10 @@ import { Zap, ShieldCheck, Truck, RefreshCcw, BadgeCheck } from 'lucide-react'
 import { CATEGORIES } from '../../data/products'
 
 const SOCIALS = [
-  { label: 'Facebook', path: 'M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z' },
-  { label: 'Instagram', path: 'M16 3H8a5 5 0 0 0-5 5v8a5 5 0 0 0 5 5h8a5 5 0 0 0 5-5V8a5 5 0 0 0-5-5Zm-4 12.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5Zm5.2-8.2a.9.9 0 1 1 .9-.9.9.9 0 0 1-.9.9Z' },
-  { label: 'YouTube', path: 'M21.6 7.2a2.6 2.6 0 0 0-1.8-1.9C18.2 5 12 5 12 5s-6.2 0-7.8.3A2.6 2.6 0 0 0 2.4 7.2 27.3 27.3 0 0 0 2 12a27.3 27.3 0 0 0 .4 4.8 2.6 2.6 0 0 0 1.8 1.9C5.8 19 12 19 12 19s6.2 0 7.8-.3a2.6 2.6 0 0 0 1.8-1.9A27.3 27.3 0 0 0 22 12a27.3 27.3 0 0 0-.4-4.8ZM10 15V9l5.2 3Z' },
-  { label: 'X', path: 'M17.7 3H21l-7.1 8.2L22.2 21h-6.6l-5.1-6.1L4.6 21H1.3l7.6-8.7L1.8 3h6.8l4.6 5.6Zm-1.2 16h1.8L7.1 4.9H5.2Z' },
+  { label: 'Facebook', url: 'https://facebook.com/fleetmart', path: 'M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z' },
+  { label: 'Instagram', url: 'https://instagram.com/fleetmart', path: 'M16 3H8a5 5 0 0 0-5 5v8a5 5 0 0 0 5 5h8a5 5 0 0 0 5-5V8a5 5 0 0 0-5-5Zm-4 12.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5Zm5.2-8.2a.9.9 0 1 1 .9-.9.9.9 0 0 1-.9.9Z' },
+  { label: 'YouTube', url: 'https://youtube.com/@fleetmart', path: 'M21.6 7.2a2.6 2.6 0 0 0-1.8-1.9C18.2 5 12 5 12 5s-6.2 0-7.8.3A2.6 2.6 0 0 0 2.4 7.2 27.3 27.3 0 0 0 2 12a27.3 27.3 0 0 0 .4 4.8 2.6 2.6 0 0 0 1.8 1.9C5.8 19 12 19 12 19s6.2 0 7.8-.3a2.6 2.6 0 0 0 1.8-1.9A27.3 27.3 0 0 0 22 12a27.3 27.3 0 0 0-.4-4.8ZM10 15V9l5.2 3Z' },
+  { label: 'X', url: 'https://x.com/fleetmart', path: 'M17.7 3H21l-7.1 8.2L22.2 21h-6.6l-5.1-6.1L4.6 21H1.3l7.6-8.7L1.8 3h6.8l4.6 5.6Zm-1.2 16h1.8L7.1 4.9H5.2Z' },
 ]
 
 export default function Footer() {
@@ -15,7 +15,7 @@ export default function Footer() {
   const [done, setDone] = useState(false)
 
   return (
-    <footer className="border-t border-line bg-pitch">
+    <footer className="border-t border-line bg-pitch dark:bg-pitch bg-gray-50">
       {/* Trust strip */}
       <div className="border-b border-line">
         <div className="container-fm grid grid-cols-2 gap-6 py-8 md:grid-cols-4">
@@ -28,7 +28,7 @@ export default function Footer() {
             <div key={t.title} className="flex items-center gap-3">
               {t.icon}
               <div>
-                <p className="font-head text-sm font-semibold uppercase tracking-wider text-chalk">{t.title}</p>
+                <p className="font-head text-sm font-semibold uppercase tracking-wider text-chalk dark:text-chalk text-gray-900">{t.title}</p>
                 <p className="text-xs text-muted">{t.sub}</p>
               </div>
             </div>
@@ -42,7 +42,7 @@ export default function Footer() {
             <span className="grid h-8 w-8 place-items-center bg-volt">
               <Zap size={18} className="fill-night text-night" />
             </span>
-            <span className="font-display text-3xl tracking-wider text-chalk">FLEET<span className="text-volt">MART</span></span>
+            <span className="font-display text-3xl tracking-wider text-chalk dark:text-chalk text-gray-900">FLEET<span className="text-volt">MART</span></span>
           </Link>
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted">
             Bangladesh's home ground for football gear. Premium jerseys, boots and equipment — with custom name & number printing that hits different.
@@ -74,7 +74,7 @@ export default function Footer() {
         </div>
 
         <div>
-          <p className="font-head text-sm font-semibold uppercase tracking-[0.2em] text-chalk">Shop</p>
+          <p className="font-head text-sm font-semibold uppercase tracking-[0.2em] text-chalk dark:text-chalk text-gray-900">Shop</p>
           <ul className="mt-4 space-y-2.5">
             {CATEGORIES.map((c) => (
               <li key={c.id}>
@@ -85,7 +85,7 @@ export default function Footer() {
         </div>
 
         <div>
-          <p className="font-head text-sm font-semibold uppercase tracking-[0.2em] text-chalk">Support</p>
+          <p className="font-head text-sm font-semibold uppercase tracking-[0.2em] text-chalk dark:text-chalk text-gray-900">Support</p>
           <ul className="mt-4 space-y-2.5">
             {[
               ['Track Order', '/account/orders'],
@@ -102,7 +102,7 @@ export default function Footer() {
         </div>
 
         <div>
-          <p className="font-head text-sm font-semibold uppercase tracking-[0.2em] text-chalk">Company</p>
+          <p className="font-head text-sm font-semibold uppercase tracking-[0.2em] text-chalk dark:text-chalk text-gray-900">Company</p>
           <ul className="mt-4 space-y-2.5">
             {[
               ['About Us', '/about'],
@@ -117,7 +117,7 @@ export default function Footer() {
           </ul>
           <div className="mt-5 flex gap-3">
             {SOCIALS.map((s) => (
-              <a key={s.label} href="#" aria-label={s.label} className="grid h-9 w-9 place-items-center border border-line text-muted transition-colors hover:border-volt hover:text-volt">
+              <a key={s.label} href={s.url} target="_blank" rel="noopener noreferrer" aria-label={s.label} className="grid h-9 w-9 place-items-center border border-line text-muted transition-colors hover:border-volt hover:text-volt">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d={s.path} /></svg>
               </a>
             ))}

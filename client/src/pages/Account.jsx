@@ -1,32 +1,84 @@
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
-import { useSelector } from 'react-redux'
-import { useState } from 'react'
-import { User, Package, MapPin, Heart, LogOut, Check, Truck, Home } from 'lucide-react'
+import { useSelector, useDispatch } from 'react-redux'
+import { useState, useEffect } from 'react'
+import { User, Package, MapPin, Heart, LogOut, Check, Truck, Home, CreditCard, Plus, Trash2, Save } from 'lucide-react'
 import { fmt } from '../lib/format'
+import { toast } from '../features/uiSlice'
+import api from '../lib/api'
 
 const TABS = [
   { id: 'profile', label: 'Profile', icon: <User size={16} /> },
   { id: 'orders', label: 'Orders', icon: <Package size={16} /> },
   { id: 'addresses', label: 'Addresses', icon: <MapPin size={16} /> },
+  { id: 'billing', label: 'Billing', icon: <CreditCard size={16} /> },
   { id: 'wishlist', label: 'Wishlist', icon: <Heart size={16} /> },
 ]
 
-const ORDER_STAGES = ['Processing', 'Confirmed', 'Shipped', 'Delivered']
-
-const MOCK_ORDERS = [
-  { id: 'FM-2026-1042', date: '2026-08-24', total: 4497, items: '2× Omega FC Home Kit', stage: 2 },
-  { id: 'FM-2026-0977', date: '2026-08-12', total: 7499, items: '1× StrikerX Velocity FG', stage: 3 },
-  { id: 'FM-2026-0855', date: '2026-07-30', total: 2199, items: '1× Midnight SC Third Kit', stage: 3 },
-]
+const ORDER_STAGES = ['processing', 'confirmed', 'shipped', 'delivered']
 
 export default function Account() {
   const { tab = 'profile' } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
+  const dispatch = useDispatch()
   const wishCount = useSelector((s) => s.wishlist.length)
+
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [orders, setOrders] = useState([])
+  const [ordersLoading, setOrdersLoading] = useState(false)
   const [loggedOut, setLoggedOut] = useState(false)
 
-  if (loggedOut) {
+  const fetchUser = async () => {
+    try {
+      const { data } = await api.get('/auth/me')
+      setUser(data.user)
+      localStorage.setItem('fm_user', JSON.stringify(data.user))
+    } catch {
+      handleLogout()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchOrders = async () => {
+    setOrdersLoading(true)
+    try {
+      const { data } = await api.get('/orders/my')
+      setOrders(data.orders || data || [])
+    } catch {
+      setOrders([])
+    } finally {
+      setOrdersLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchUser()
+  }, [])
+
+  useEffect(() => {
+    if (tab === 'orders') fetchOrders()
+  }, [tab])
+
+  const handleLogout = async () => {
+    try {
+      await api.post('/auth/logout')
+    } catch {}
+    localStorage.removeItem('fm_token')
+    localStorage.removeItem('fm_user')
+    setLoggedOut(true)
+  }
+
+  if (loading) {
+    return (
+      <div className="container-fm py-24 text-center">
+        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-volt border-t-transparent" />
+      </div>
+    )
+  }
+
+  if (loggedOut || !user) {
     return (
       <div className="container-fm grid place-items-center py-24 text-center">
         <p className="font-display text-5xl uppercase tracking-wide text-chalk">Subbed off.</p>
@@ -55,7 +107,7 @@ export default function Account() {
                 </Link>
               )
             })}
-            <button onClick={() => setLoggedOut(true)} className="flex items-center gap-3 px-5 py-4 font-head text-sm font-semibold uppercase tracking-widest text-muted transition-colors hover:text-ember">
+            <button onClick={handleLogout} className="flex items-center gap-3 px-5 py-4 font-head text-sm font-semibold uppercase tracking-widest text-muted transition-colors hover:text-ember">
               <LogOut size={16} /> Log out
             </button>
           </nav>
@@ -63,85 +115,325 @@ export default function Account() {
 
         <div>
           {activeTab === 'profile' && location.pathname !== '/account/wishlist' && (
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="border border-line bg-pitch p-6">
-                <p className="font-head text-sm font-semibold uppercase tracking-widest text-chalk">Personal Info</p>
-                <div className="mt-4 space-y-4">
-                  <div><label className="mb-1 block text-xs uppercase tracking-widest text-muted">Name</label><input defaultValue="Aronno" className="input-fm" /></div>
-                  <div><label className="mb-1 block text-xs uppercase tracking-widest text-muted">Email</label><input defaultValue="aronno@fleetmart.com" className="input-fm" /></div>
-                  <div><label className="mb-1 block text-xs uppercase tracking-widest text-muted">Phone</label><input defaultValue="01700-000000" className="input-fm" /></div>
-                  <button className="btn-volt !py-2.5 !text-xs">Save Changes</button>
-                </div>
-              </div>
-              <div className="space-y-6">
-                <div className="border border-line bg-pitch p-6">
-                  <p className="font-head text-sm font-semibold uppercase tracking-widest text-chalk">Fleetmart Stats</p>
-                  <div className="mt-4 grid grid-cols-3 gap-3 text-center">
-                    {[['12', 'Orders'], ['৳8.4k', 'Spent'], ['Gold', 'Tier']].map(([v, l]) => (
-                      <div key={l} className="border border-line bg-night p-3">
-                        <p className="font-display text-2xl text-volt">{v}</p>
-                        <p className="text-[10px] uppercase tracking-widest text-muted">{l}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="border border-volt/30 bg-volt/5 p-6">
-                  <p className="font-head text-sm font-semibold uppercase tracking-widest text-volt">⚡ Next reward</p>
-                  <p className="mt-2 text-sm text-muted">Spend ৳1,600 more to unlock <span className="text-chalk">free printing</span> on your next custom jersey.</p>
-                  <div className="mt-3 h-1.5 bg-line"><div className="h-full w-2/3 bg-volt" /></div>
-                </div>
-              </div>
-            </div>
+            <ProfileTab user={user} setUser={setUser} dispatch={dispatch} />
           )}
+          {activeTab === 'orders' && location.pathname !== '/account/wishlist' && (
+            <OrdersTab orders={orders} loading={ordersLoading} />
+          )}
+          {activeTab === 'addresses' && (
+            <AddressesTab user={user} setUser={setUser} dispatch={dispatch} />
+          )}
+          {activeTab === 'billing' && (
+            <BillingTab user={user} setUser={setUser} dispatch={dispatch} />
+          )}
+          {(activeTab === 'wishlist' || location.pathname === '/account/wishlist') && <WishlistInline />}
+        </div>
+      </div>
+    </div>
+  )
+}
 
-          {(activeTab === 'orders') && location.pathname !== '/account/wishlist' && (
-            <div className="space-y-4">
-              {MOCK_ORDERS.map((o) => (
-                <div key={o.id} className="border border-line bg-pitch p-6">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="font-head text-lg font-semibold uppercase tracking-wide text-chalk">#{o.id}</p>
-                      <p className="text-xs text-muted">Placed {o.date} · {o.items}</p>
-                    </div>
-                    <p className="font-head text-xl font-semibold text-volt">{fmt(o.total)}</p>
+function ProfileTab({ user, setUser, dispatch }) {
+  const [form, setForm] = useState({
+    name: user.name || '',
+    email: user.email || '',
+    phone: user.phone || '',
+  })
+  const [passwords, setPasswords] = useState({ current: '', newPass: '', confirm: '' })
+  const [saving, setSaving] = useState(false)
+  const [changingPass, setChangingPass] = useState(false)
+
+  const saveProfile = async () => {
+    setSaving(true)
+    try {
+      const { data } = await api.put('/auth/profile', {
+        name: form.name,
+        phone: form.phone,
+      })
+      setUser(data.user)
+      localStorage.setItem('fm_user', JSON.stringify(data.user))
+      dispatch(toast({ type: 'success', message: 'Profile updated!' }))
+    } catch (err) {
+      dispatch(toast({ type: 'error', message: err.response?.data?.message || 'Update failed' }))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const changePassword = async () => {
+    if (passwords.newPass !== passwords.confirm) {
+      dispatch(toast({ type: 'error', message: 'Passwords do not match' }))
+      return
+    }
+    if (passwords.newPass.length < 6) {
+      dispatch(toast({ type: 'error', message: 'Password must be at least 6 characters' }))
+      return
+    }
+    setChangingPass(true)
+    try {
+      await api.put('/auth/password', { currentPassword: passwords.current, newPassword: passwords.newPass })
+      dispatch(toast({ type: 'success', message: 'Password changed!' }))
+      setPasswords({ current: '', newPass: '', confirm: '' })
+    } catch (err) {
+      dispatch(toast({ type: 'error', message: err.response?.data?.message || 'Failed to change password' }))
+    } finally {
+      setChangingPass(false)
+    }
+  }
+
+  return (
+    <div className="grid gap-6 md:grid-cols-2">
+      <div className="border border-line bg-pitch p-6">
+        <p className="font-head text-sm font-semibold uppercase tracking-widest text-chalk">Personal Info</p>
+        <div className="mt-4 space-y-4">
+          <div>
+            <label className="mb-1 block text-xs uppercase tracking-widest text-muted">Name</label>
+            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-fm" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs uppercase tracking-widest text-muted">Email</label>
+            <input value={form.email} disabled className="input-fm opacity-60 cursor-not-allowed" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs uppercase tracking-widest text-muted">Phone</label>
+            <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="01XXXXXXXXX" className="input-fm" />
+          </div>
+          <button onClick={saveProfile} disabled={saving} className="btn-volt !py-2.5 !text-xs">
+            <Save size={14} /> {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        <div className="border border-line bg-pitch p-6">
+          <p className="font-head text-sm font-semibold uppercase tracking-widest text-chalk">Account Stats</p>
+          <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+            {[[user.role === 'admin' ? 'Admin' : 'Member', 'Role'], ['Active', 'Status'], [new Date(user.createdAt).toLocaleDateString(), 'Joined']].map(([v, l]) => (
+              <div key={l} className="border border-line bg-night p-3">
+                <p className="font-display text-lg text-volt">{v}</p>
+                <p className="text-[10px] uppercase tracking-widest text-muted">{l}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="border border-line bg-pitch p-6">
+          <p className="font-head text-sm font-semibold uppercase tracking-widest text-chalk">Change Password</p>
+          <div className="mt-4 space-y-3">
+            <input type="password" placeholder="Current password" value={passwords.current} onChange={(e) => setPasswords({ ...passwords, current: e.target.value })} className="input-fm" />
+            <input type="password" placeholder="New password (min 6 chars)" value={passwords.newPass} onChange={(e) => setPasswords({ ...passwords, newPass: e.target.value })} className="input-fm" />
+            <input type="password" placeholder="Confirm new password" value={passwords.confirm} onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })} className="input-fm" />
+            <button onClick={changePassword} disabled={changingPass || !passwords.current || !passwords.newPass} className="btn-ghost !py-2.5 !text-xs">
+              {changingPass ? 'Changing…' : 'Update Password'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OrdersTab({ orders, loading }) {
+  if (loading) {
+    return <div className="py-12 text-center text-muted">Loading orders…</div>
+  }
+
+  if (orders.length === 0) {
+    return (
+      <div className="border border-line bg-pitch p-12 text-center">
+        <p className="font-display text-4xl uppercase tracking-wide text-muted">No orders yet</p>
+        <Link to="/shop" className="btn-volt mt-5 !text-xs">Start Shopping</Link>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {orders.map((o) => {
+        const stage = ORDER_STAGES.indexOf(o.status) >= 0 ? ORDER_STAGES.indexOf(o.status) : 0
+        return (
+          <div key={o.orderId || o._id} className="border border-line bg-pitch p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="font-head text-lg font-semibold uppercase tracking-wide text-chalk">#{o.orderId || o._id}</p>
+                <p className="text-xs text-muted">Placed {new Date(o.createdAt).toLocaleDateString()} · {o.items?.length || 0} items</p>
+              </div>
+              <p className="font-head text-xl font-semibold text-volt">{fmt(o.totals?.grand || o.total || 0)}</p>
+            </div>
+            <div className="mt-6 flex items-center">
+              {ORDER_STAGES.map((s, i) => (
+                <div key={s} className="flex flex-1 items-center">
+                  <div className="flex flex-col items-center gap-1.5">
+                    <span className={`grid h-8 w-8 place-items-center rounded-full border-2 ${i < stage ? 'border-volt bg-volt text-night' : i === stage ? 'border-volt text-volt' : 'border-line text-muted'}`}>
+                      {i < stage ? <Check size={14} /> : i === stage ? <Truck size={14} /> : <Home size={12} />}
+                    </span>
+                    <span className={`text-[10px] font-semibold uppercase tracking-widest ${i <= stage ? 'text-volt' : 'text-muted'}`}>{s}</span>
                   </div>
-                  {/* timeline */}
-                  <div className="mt-6 flex items-center">
-                    {ORDER_STAGES.map((s, i) => (
-                      <div key={s} className={`flex flex-1 items-center ${i === ORDER_STAGES.length - 1 ? '' : ''}`}>
-                        <div className="flex flex-col items-center gap-1.5">
-                          <span className={`grid h-8 w-8 place-items-center rounded-full border-2 ${i < o.stage ? 'border-volt bg-volt text-night' : i === o.stage ? 'border-volt text-volt' : 'border-line text-muted'}`}>
-                            {i < o.stage ? <Check size={14} /> : i === o.stage ? <Truck size={14} /> : <Home size={12} />}
-                          </span>
-                          <span className={`text-[10px] font-semibold uppercase tracking-widest ${i <= o.stage ? 'text-volt' : 'text-muted'}`}>{s}</span>
-                        </div>
-                        {i < ORDER_STAGES.length - 1 && <span className={`mx-1 h-0.5 flex-1 ${i < o.stage ? 'bg-volt' : 'bg-line'}`} />}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-5 flex gap-2">
-                    <button className="btn-ghost !px-4 !py-2 !text-[11px]">Invoice</button>
-                    {o.stage < 3 && <button className="btn-ghost !px-4 !py-2 !text-[11px]">Cancel</button>}
-                  </div>
+                  {i < ORDER_STAGES.length - 1 && <span className={`mx-1 h-0.5 flex-1 ${i < stage ? 'bg-volt' : 'bg-line'}`} />}
                 </div>
               ))}
             </div>
-          )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
-          {activeTab === 'addresses' && (
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="border border-volt/40 bg-pitch p-6">
-                <p className="flex items-center justify-between font-head text-sm font-semibold uppercase tracking-widest text-chalk">Home <span className="bg-volt px-2 py-0.5 text-[10px] text-night">Default</span></p>
-                <p className="mt-3 text-sm leading-relaxed text-muted">House 12, Road 5, Dhanmondi<br />Dhaka 1205 · 01700-000000</p>
+function AddressesTab({ user, setUser, dispatch }) {
+  const [addresses, setAddresses] = useState(user.addresses || [])
+  const [editing, setEditing] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const empty = { label: 'Home', street: '', city: 'Dhaka', zip: '', country: 'Bangladesh', phone: '', isDefault: false }
+
+  const saveAddresses = async (addrs) => {
+    setSaving(true)
+    try {
+      const { data } = await api.put('/auth/addresses', { addresses: addrs })
+      setUser(data.user)
+      localStorage.setItem('fm_user', JSON.stringify(data.user))
+      dispatch(toast({ type: 'success', message: 'Addresses updated!' }))
+    } catch (err) {
+      dispatch(toast({ type: 'error', message: err.response?.data?.message || 'Update failed' }))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const addAddress = () => {
+    const updated = [...addresses, { ...empty }]
+    setAddresses(updated)
+    setEditing(updated.length - 1)
+  }
+
+  const removeAddress = (idx) => {
+    const updated = addresses.filter((_, i) => i !== idx)
+    setAddresses(updated)
+    saveAddresses(updated)
+  }
+
+  const setDefault = (idx) => {
+    const updated = addresses.map((a, i) => ({ ...a, isDefault: i === idx }))
+    setAddresses(updated)
+    saveAddresses(updated)
+  }
+
+  const saveOne = (idx, addr) => {
+    const updated = [...addresses]
+    updated[idx] = addr
+    setAddresses(updated)
+    setEditing(null)
+    saveAddresses(updated)
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="font-head text-sm font-semibold uppercase tracking-widest text-chalk">Saved Addresses</p>
+        <button onClick={addAddress} className="btn-ghost !py-2 !text-[11px]"><Plus size={14} /> Add Address</button>
+      </div>
+
+      {addresses.length === 0 && editing === null && (
+        <div className="border border-dashed border-line p-8 text-center text-sm text-muted">
+          No addresses saved yet. Add one for faster checkout.
+        </div>
+      )}
+
+      {addresses.map((addr, idx) => (
+        <div key={idx} className="border border-line bg-pitch p-5">
+          {editing === idx ? (
+            <AddressForm
+              addr={addr}
+              onSave={(a) => saveOne(idx, a)}
+              onCancel={() => setEditing(null)}
+            />
+          ) : (
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="flex items-center gap-2 font-head text-sm font-semibold uppercase tracking-widest text-chalk">
+                  {addr.label || 'Address'} {addr.isDefault && <span className="bg-volt px-2 py-0.5 text-[10px] text-night">Default</span>}
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-muted">
+                  {addr.street}<br />{addr.city} {addr.zip} · {addr.country}
+                  {addr.phone && <><br />{addr.phone}</>}
+                </p>
               </div>
-              <button className="grid min-h-40 place-items-center border border-dashed border-line text-sm text-muted transition-colors hover:border-volt hover:text-volt">
-                + Add new address
-              </button>
+              <div className="flex gap-2">
+                {!addr.isDefault && (
+                  <button onClick={() => setDefault(idx)} className="text-[10px] uppercase tracking-widest text-volt hover:underline">Set default</button>
+                )}
+                <button onClick={() => setEditing(idx)} className="text-[10px] uppercase tracking-widest text-muted hover:text-chalk">Edit</button>
+                <button onClick={() => removeAddress(idx)} className="text-ember"><Trash2 size={14} /></button>
+              </div>
             </div>
           )}
-
-          {(activeTab === 'wishlist' || location.pathname === '/account/wishlist') && <WishlistInline />}
         </div>
+      ))}
+    </div>
+  )
+}
+
+function AddressForm({ addr, onSave, onCancel }) {
+  const [form, setForm] = useState({ ...addr })
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <input placeholder="Label (Home, Office…)" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} className="input-fm" />
+      <input placeholder="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="input-fm" />
+      <input placeholder="Street / House / Road" value={form.street} onChange={(e) => setForm({ ...form, street: e.target.value })} className="input-fm sm:col-span-2" />
+      <select value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="input-fm">
+        {['Dhaka', 'Chattogram', 'Sylhet', 'Khulna', 'Rajshahi', 'Barishal', 'Rangpur', 'Mymensingh'].map((c) => <option key={c}>{c}</option>)}
+      </select>
+      <input placeholder="Area / Post code" value={form.zip} onChange={(e) => setForm({ ...form, zip: e.target.value })} className="input-fm" />
+      <div className="sm:col-span-2 flex gap-2">
+        <button onClick={() => onSave(form)} className="btn-volt !py-2 !text-[11px]"><Save size={12} /> Save</button>
+        <button onClick={onCancel} className="btn-ghost !py-2 !text-[11px]">Cancel</button>
+      </div>
+    </div>
+  )
+}
+
+function BillingTab({ user, setUser, dispatch }) {
+  const [form, setForm] = useState(user.billing || { name: '', email: '', phone: '', taxId: '' })
+  const [saving, setSaving] = useState(false)
+
+  const saveBilling = async () => {
+    setSaving(true)
+    try {
+      const { data } = await api.put('/auth/billing', { billing: form })
+      setUser(data.user)
+      localStorage.setItem('fm_user', JSON.stringify(data.user))
+      dispatch(toast({ type: 'success', message: 'Billing info updated!' }))
+    } catch (err) {
+      dispatch(toast({ type: 'error', message: err.response?.data?.message || 'Update failed' }))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="border border-line bg-pitch p-6 max-w-lg">
+      <p className="font-head text-sm font-semibold uppercase tracking-widest text-chalk">Billing Details</p>
+      <p className="mt-1 mb-4 text-xs text-muted">Used for invoices and payment receipts.</p>
+      <div className="space-y-4">
+        <div>
+          <label className="mb-1 block text-xs uppercase tracking-widest text-muted">Billing Name</label>
+          <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Name on invoice" className="input-fm" />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs uppercase tracking-widest text-muted">Billing Email</label>
+          <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="Email for invoices" className="input-fm" />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs uppercase tracking-widest text-muted">Phone</label>
+          <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="01XXXXXXXXX" className="input-fm" />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs uppercase tracking-widest text-muted">Tax ID / BIN</label>
+          <input value={form.taxId} onChange={(e) => setForm({ ...form, taxId: e.target.value })} placeholder="Optional" className="input-fm" />
+        </div>
+        <button onClick={saveBilling} disabled={saving} className="btn-volt !py-2.5 !text-xs">
+          <Save size={14} /> {saving ? 'Saving…' : 'Save Billing Info'}
+        </button>
       </div>
     </div>
   )

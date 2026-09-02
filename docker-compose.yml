@@ -1,0 +1,26 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo_data:/data/db
+
+  server:
+    build: .
+    restart: unless-stopped
+    ports:
+      - '5000:5000'
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - MONGODB_URI=mongodb://mongo:27017/fleetmart
+      - JWT_SECRET=${JWT_SECRET:-change_me_to_random_string}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-change_me_to_random_string}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5000}
+    depends_on:
+      - mongo
+
+volumes:
+  mongo_data:

@@ -5,28 +5,33 @@ import { Trash2, Plus, Minus, Tag, X, ArrowRight } from 'lucide-react'
 import { removeFromCart, setQty, cartTotal } from '../features/cartSlice'
 import { toast } from '../features/uiSlice'
 import { fmt } from '../lib/format'
-
-const COUPONS = { GEARUP10: 10, MATCHDAY5: 5 }
+import api from '../lib/api'
 
 export default function Cart() {
   const dispatch = useDispatch()
   const items = useSelector((s) => s.cart)
   const total = useSelector(cartTotal)
   const [code, setCode] = useState('')
-  const [applied, setApplied] = useState(null) // { code, pct }
+  const [applied, setApplied] = useState(null) // { code, discount }
+  const [validating, setValidating] = useState(false)
 
-  const discount = applied ? Math.round((total * applied.pct) / 100) : 0
+  const discount = applied ? applied.discount : 0
   const shipping = total >= 3000 || total === 0 ? 0 : 80
   const grand = total - discount + shipping
 
-  const applyCoupon = () => {
+  const applyCoupon = async () => {
     const c = code.trim().toUpperCase()
-    if (COUPONS[c]) {
-      setApplied({ code: c, pct: COUPONS[c] })
-      dispatch(toast({ type: 'success', message: `Coupon ${c} applied — ${COUPONS[c]}% off` }))
+    if (!c) return
+    setValidating(true)
+    try {
+      const { data } = await api.post('/coupons/validate', { code: c, subtotal: total })
+      setApplied({ code: c, discount: data.discount || 0 })
+      dispatch(toast({ type: 'success', message: `Coupon ${c} applied — ${fmt(data.discount)} off` }))
       setCode('')
-    } else {
-      dispatch(toast({ type: 'error', message: 'Invalid or expired coupon' }))
+    } catch (err) {
+      dispatch(toast({ type: 'error', message: err.response?.data?.message || 'Invalid or expired coupon' }))
+    } finally {
+      setValidating(false)
     }
   }
 
@@ -85,13 +90,13 @@ export default function Cart() {
             <p className="mb-2 flex items-center gap-2 text-xs uppercase tracking-widest text-muted"><Tag size={13} /> Coupon code</p>
             {applied ? (
               <div className="flex items-center justify-between border border-volt/40 bg-volt/10 px-3 py-2.5">
-                <span className="font-head text-sm font-semibold uppercase tracking-widest text-volt">{applied.code} · −{applied.pct}%</span>
+                <span className="font-head text-sm font-semibold uppercase tracking-widest text-volt">{applied.code} · −{fmt(applied.discount)}</span>
                 <button onClick={() => setApplied(null)} aria-label="Remove coupon" className="text-muted hover:text-ember"><X size={14} /></button>
               </div>
             ) : (
               <div className="flex">
                 <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="GEARUP10" className="input-fm !border-r-0 uppercase" />
-                <button onClick={applyCoupon} className="btn-volt !px-4">Apply</button>
+                <button onClick={applyCoupon} disabled={validating} className="btn-volt !px-4">{validating ? '...' : 'Apply'}</button>
               </div>
             )}
           </div>

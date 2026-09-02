@@ -23,7 +23,7 @@ export function ProductCardSkeleton() {
 
 export default function ProductCard({ product, hideArt = false }) {
   const dispatch = useDispatch()
-  const wished = useSelector(inWishlist(product.id))
+  const wished = useSelector(inWishlist(product._id))
   const price = discounted(product)
   const pct = discountPct(product)
   const stock = totalStock(product)
@@ -41,7 +41,7 @@ export default function ProductCard({ product, hideArt = false }) {
     const size = defaultSize()
     dispatch(
       addToCart({
-        id: product.id, slug: product.slug, name: product.name, price,
+        id: product._id, slug: product.slug, name: product.name, price,
         art: product.artColors || null, size,
         customization: product.customizable ? { name: 'FLEET', number: '10' } : null,
       })
@@ -56,7 +56,7 @@ export default function ProductCard({ product, hideArt = false }) {
 
   const wish = (e) => {
     e.preventDefault()
-    dispatch(toggleWishlist({ id: product.id, slug: product.slug, name: product.name }))
+    dispatch(toggleWishlist({ id: product._id, slug: product.slug, name: product.name }))
     dispatch(toast({ type: 'wishlist', message: wished ? 'Removed from wishlist' : 'Saved to wishlist' }))
   }
 

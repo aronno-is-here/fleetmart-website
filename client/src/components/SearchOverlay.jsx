@@ -49,8 +49,8 @@ export default function SearchOverlay() {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-start justify-center bg-night/90 px-4 pt-24 backdrop-blur-md" onClick={() => dispatch(setSearchOpen(false))}>
-      <div className="w-full max-w-2xl border border-line bg-pitch shadow-card animate-fadeUp" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[80] flex items-start justify-center bg-night/90 dark:bg-night/90 bg-black/50 px-4 pt-24 backdrop-blur-md" onClick={() => dispatch(setSearchOpen(false))}>
+      <div className="w-full max-w-2xl border border-line bg-pitch dark:bg-pitch bg-white shadow-card animate-fadeUp" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3 border-b border-line px-5 py-4">
           <Search size={20} className="text-volt" />
           <input
@@ -61,7 +61,7 @@ export default function SearchOverlay() {
               if (e.key === 'Enter' && results[0]) go(results[0].slug)
             }}
             placeholder="Search jerseys, boots, clubs…"
-            className="w-full bg-transparent text-lg text-chalk outline-none placeholder:text-muted"
+            className="w-full bg-transparent text-lg text-chalk dark:text-chalk text-gray-900 outline-none placeholder:text-muted"
           />
           <button onClick={() => dispatch(setSearchOpen(false))} aria-label="Close search" className="text-muted hover:text-chalk">
             <X size={18} />
@@ -73,8 +73,8 @@ export default function SearchOverlay() {
             <ul className="divide-y divide-line">
               {results.map((p) => (
                 <li key={p._id}>
-                  <button onClick={() => go(p.slug)} className="group flex w-full items-center gap-4 px-5 py-3 text-left transition-colors hover:bg-pitch2">
-                    <span className="h-12 w-12 shrink-0 border border-line bg-night flex items-center justify-center overflow-hidden">
+                  <button onClick={() => go(p.slug)} className="group flex w-full items-center gap-4 px-5 py-3 text-left transition-colors hover:bg-pitch2 dark:hover:bg-pitch2 hover:bg-gray-50">
+                    <span className="h-12 w-12 shrink-0 border border-line bg-night dark:bg-night bg-gray-100 flex items-center justify-center overflow-hidden">
                       {p.images?.[0] ? (
                         <img src={p.images[0].url} alt={p.name} className="w-full h-full object-cover" />
                       ) : (

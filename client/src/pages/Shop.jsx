@@ -146,7 +146,7 @@ export default function Shop() {
       <div className="mb-8 flex items-end justify-between">
         <div>
           <p className="eyebrow mb-2">{q ? `Results for "${q}"` : 'Browse everything'}</p>
-          <h1 className="font-display text-5xl uppercase tracking-wide text-chalk sm:text-6xl">{activeCat ? activeCat.name : 'Catalog'}</h1>
+          <h1 className="font-display text-5xl uppercase tracking-wide text-chalk dark:text-chalk text-gray-900 sm:text-6xl">{activeCat ? activeCat.name : 'Catalog'}</h1>
           <p className="mt-2 text-sm text-muted">{total} products</p>
         </div>
         <div className="flex items-center gap-3">

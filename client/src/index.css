@@ -7,7 +7,14 @@
     scroll-behavior: smooth;
   }
   body {
-    @apply bg-night text-chalk font-body antialiased;
+    @apply font-body antialiased;
+    @apply bg-night text-chalk;
+  }
+  .dark body, body {
+    @apply bg-night text-chalk;
+  }
+  html:not(.dark) body {
+    @apply bg-white text-gray-900;
   }
   ::selection {
     @apply bg-volt text-night;
@@ -17,14 +24,23 @@
     height: 8px;
   }
   ::-webkit-scrollbar-track {
-    background: #0a0e13;
+    @apply bg-night;
+  }
+  html:not(.dark) ::-webkit-scrollbar-track {
+    @apply bg-gray-100;
   }
   ::-webkit-scrollbar-thumb {
+    @apply rounded-lg;
     background: #223040;
-    border-radius: 8px;
+  }
+  html:not(.dark) ::-webkit-scrollbar-thumb {
+    background: #c4c9d0;
   }
   ::-webkit-scrollbar-thumb:hover {
     background: #2f4256;
+  }
+  html:not(.dark) ::-webkit-scrollbar-thumb:hover {
+    background: #a0a8b4;
   }
 }
 
@@ -38,14 +54,23 @@
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-2 border border-line text-chalk font-head font-medium uppercase tracking-widest text-sm px-6 py-3 transition-all duration-200 hover:border-volt hover:text-volt active:scale-[0.97];
   }
+  html:not(.dark) .btn-ghost {
+    @apply border-gray-300 text-gray-700 hover:border-volt hover:text-volt;
+  }
   .eyebrow {
     @apply font-head text-xs font-semibold uppercase tracking-[0.25em] text-volt;
   }
   .card {
     @apply bg-pitch border border-line;
   }
+  html:not(.dark) .card {
+    @apply bg-white border-gray-200;
+  }
   .input-fm {
     @apply w-full bg-pitch2 border border-line px-4 py-3 text-sm text-chalk placeholder-muted outline-none transition-colors focus:border-volt;
+  }
+  html:not(.dark) .input-fm {
+    @apply bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-volt;
   }
   .skeleton {
     @apply animate-shimmer rounded bg-pitch2;
@@ -56,6 +81,15 @@
       rgba(255, 255, 255, 0) 80px
     );
     background-size: 400px 100%;
+  }
+  html:not(.dark) .skeleton {
+    @apply bg-gray-100;
+    background-image: linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0) 0,
+      rgba(0, 0, 0, 0.04) 40px,
+      rgba(0, 0, 0, 0) 80px
+    );
   }
   .no-scrollbar::-webkit-scrollbar {
     display: none;

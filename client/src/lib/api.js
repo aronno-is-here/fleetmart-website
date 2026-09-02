@@ -16,8 +16,14 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      localStorage.removeItem('fm_token')
-      localStorage.removeItem('fm_user')
+      const token = localStorage.getItem('fm_token')
+      if (token && !err.config?.url?.includes('/auth/login') && !err.config?.url?.includes('/auth/register')) {
+        localStorage.removeItem('fm_token')
+        localStorage.removeItem('fm_user')
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login'
+        }
+      }
     }
     return Promise.reject(err)
   }

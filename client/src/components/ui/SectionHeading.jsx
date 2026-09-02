@@ -5,7 +5,7 @@ export default function SectionHeading({ eyebrow, title, action, to }) {
     <div className="mb-8 flex items-end justify-between gap-4">
       <div>
         {eyebrow && <p className="eyebrow mb-2">{eyebrow}</p>}
-        <h2 className="font-display text-4xl uppercase leading-none tracking-wide text-chalk sm:text-5xl">{title}</h2>
+        <h2 className="font-display text-4xl uppercase leading-none tracking-wide text-chalk dark:text-chalk text-gray-900 sm:text-5xl">{title}</h2>
       </div>
       {action &&
         (to ? (
