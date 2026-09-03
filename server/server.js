@@ -29,7 +29,9 @@ const PORT = process.env.PORT || 5000
 
 const corsOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
-  : ['http://localhost:5173', 'http://localhost:3000']
+  : process.env.NODE_ENV === 'development'
+    ? true
+    : ['http://localhost:5173', 'http://localhost:3000']
 
 // Security headers
 app.use(helmet({
