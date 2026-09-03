@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
 import { Zap, Eye, EyeOff } from 'lucide-react'
 import { toast } from '../features/uiSlice'
+import { setCredentials } from '../features/authSlice'
 import api from '../lib/api'
 
 export function AuthShell({ title, sub, children }) {
@@ -65,10 +66,9 @@ function SocialButtons() {
   const handleGoogleLogin = async (credential) => {
     try {
       const { data } = await api.post('/auth/google', { credential })
-      localStorage.setItem('fm_token', data.token)
-      localStorage.setItem('fm_user', JSON.stringify(data.user))
+      dispatch(setCredentials({ token: data.token, user: data.user }))
       dispatch(toast({ type: 'success', message: 'Welcome to Fleetmart!' }))
-      navigate('/account')
+      navigate('/shop')
     } catch (err) {
       dispatch(toast({ type: 'error', message: err.response?.data?.message || 'Google sign-in failed' }))
     }
@@ -178,14 +178,12 @@ export function useAuthSubmit({ mode }) {
         : { name: form.name, email: form.email, password: form.password }
 
       const { data } = await api.post(endpoint, payload)
-      localStorage.setItem('fm_token', data.token)
-      localStorage.setItem('fm_user', JSON.stringify(data.user))
+      dispatch(setCredentials({ token: data.token, user: data.user }))
       dispatch(toast({
         type: 'success',
         message: mode === 'login' ? 'Login successful — Welcome back!' : 'Account created — you are match ready!'
       }))
-      const redirectTo = mode === 'login' ? '/account' : '/account'
-      navigate(redirectTo)
+      navigate('/shop')
     } catch (err) {
       const msg = err.response?.data?.message || 'Something went wrong. Try again.'
       if (mode === 'login') {

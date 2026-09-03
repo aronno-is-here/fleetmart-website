@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import multer from 'multer'
 import { v2 as cloudinary } from 'cloudinary'
-import { protect, adminOnly } from '../middleware/auth.js'
+import { protect } from '../middleware/auth.js'
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_NAME,
@@ -21,7 +21,7 @@ const upload = multer({ storage, fileFilter, limits: { fileSize: 5 * 1024 * 1024
 
 const router = Router()
 
-router.post('/', protect, adminOnly, upload.array('images', 10), async (req, res, next) => {
+router.post('/', protect, upload.array('images', 10), async (req, res, next) => {
   try {
     const uploads = await Promise.all(
       req.files.map((file) => {

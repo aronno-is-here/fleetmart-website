@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useDispatch } from 'react-redux'
 import { Eye, EyeOff } from 'lucide-react'
+import { setCredentials } from '../../features/authSlice'
 import api from '../../lib/api'
 
 export default function AdminLogin() {
@@ -10,6 +12,7 @@ export default function AdminLogin() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const dispatch = useDispatch()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -22,8 +25,7 @@ export default function AdminLogin() {
         setLoading(false)
         return
       }
-      localStorage.setItem('fm_token', data.token)
-      localStorage.setItem('fm_user', JSON.stringify(data.user))
+      dispatch(setCredentials({ token: data.token, user: data.user }))
       navigate('/admin')
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed')

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Link, NavLink, useLocation } from 'react-router-dom'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
-import { Search, ShoppingBag, Heart, Menu, X, User, Zap } from 'lucide-react'
+import { Search, ShoppingBag, Heart, Menu, X, User, Zap, LogOut } from 'lucide-react'
 import { CATEGORIES } from '../../data/products'
 import { cartCount } from '../../features/cartSlice'
-import { setCartOpen, setSearchOpen, setMobileNavOpen } from '../../features/uiSlice'
+import { setCartOpen, setSearchOpen, setMobileNavOpen, toast } from '../../features/uiSlice'
+import { logout } from '../../features/authSlice'
 
 import Ticker from './Ticker'
 import api from '../../lib/api'
@@ -32,10 +33,21 @@ export default function Navbar() {
   const count = useSelector(cartCount)
   const wishCount = useSelector((s) => s.wishlist.length)
   const mobileOpen = useSelector((s) => s.ui.mobileNavOpen)
+  const { user } = useSelector((s) => s.auth)
   const [scrolled, setScrolled] = useState(false)
   const [megaOpen, setMegaOpen] = useState(false)
   const [catCounts, setCatCounts] = useState({})
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
+
+  const handleLogout = async () => {
+    try { await api.post('/auth/logout') } catch {}
+    dispatch(logout())
+    dispatch(toast({ type: 'success', message: 'Logged out successfully' }))
+    setUserMenuOpen(false)
+    navigate('/')
+  }
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)
@@ -95,9 +107,38 @@ export default function Navbar() {
                 <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center bg-ember px-1 text-[10px] font-bold text-white">{wishCount}</span>
               )}
             </Link>
-            <Link to="/login" aria-label="Account" className="hidden h-10 w-10 place-items-center text-chalk/85 transition-colors hover:text-volt sm:grid">
-              <User size={20} />
-            </Link>
+            {user ? (
+              <div className="relative hidden sm:block">
+                <button onClick={() => setUserMenuOpen(!userMenuOpen)} className="flex h-10 w-10 items-center justify-center text-chalk/85 transition-colors hover:text-volt">
+                  {user.avatar ? (
+                    <img src={user.avatar} alt={user.name} className="h-8 w-8 rounded-full object-cover border border-line" />
+                  ) : (
+                    <User size={20} />
+                  )}
+                </button>
+                {userMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
+                    <div className="absolute right-0 top-full z-50 mt-2 w-48 border border-line bg-pitch shadow-lg">
+                      <div className="border-b border-line px-4 py-3">
+                        <p className="text-sm font-head font-semibold text-chalk truncate">{user.name}</p>
+                        <p className="text-xs text-muted truncate">{user.email}</p>
+                      </div>
+                      <Link to="/account" onClick={() => setUserMenuOpen(false)} className="flex items-center gap-2 px-4 py-2.5 text-sm font-head text-muted hover:bg-pitch2 hover:text-chalk transition-colors">
+                        <User size={14} /> My Account
+                      </Link>
+                      <button onClick={handleLogout} className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-head text-muted hover:bg-pitch2 hover:text-ember transition-colors">
+                        <LogOut size={14} /> Logout
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <Link to="/login" aria-label="Account" className="hidden h-10 w-10 place-items-center text-chalk/85 transition-colors hover:text-volt sm:grid">
+                <User size={20} />
+              </Link>
+            )}
             <button onClick={() => dispatch(setCartOpen(true))} aria-label="Cart" className="relative grid h-10 w-10 place-items-center text-chalk/85 transition-colors hover:text-volt">
               <ShoppingBag size={20} />
               {count > 0 && (
@@ -151,7 +192,14 @@ export default function Navbar() {
             </Link>
           ))}
           <div className="mt-4 flex gap-3">
-            <Link to="/login" className="btn-ghost flex-1 justify-center !py-2.5 !text-xs">Login</Link>
+            {user ? (
+              <>
+                <Link to="/account" onClick={() => dispatch(setMobileNavOpen(false))} className="btn-ghost flex-1 justify-center !py-2.5 !text-xs">My Account</Link>
+                <button onClick={() => { dispatch(setMobileNavOpen(false)); handleLogout() }} className="btn-ghost flex-1 justify-center !py-2.5 !text-xs text-ember">Logout</button>
+              </>
+            ) : (
+              <Link to="/login" className="btn-ghost flex-1 justify-center !py-2.5 !text-xs">Login</Link>
+            )}
             <Link to="/account/wishlist" className="btn-ghost flex-1 justify-center !py-2.5 !text-xs">Wishlist ({wishCount})</Link>
           </div>
         </nav>

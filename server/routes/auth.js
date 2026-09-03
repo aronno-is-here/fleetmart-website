@@ -113,6 +113,9 @@ router.post('/login', [
     if (!user) {
       return res.status(401).json({ message: 'No account found with this email. Please register first.' })
     }
+    if (user.role === 'admin') {
+      return res.status(403).json({ message: 'Admin accounts cannot login here. Use the Admin Panel.' })
+    }
     if (!(await user.comparePassword(password))) {
       return res.status(401).json({ message: 'Wrong password. Please try again.' })
     }

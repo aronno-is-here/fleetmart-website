@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import { User, Lock, Save, Eye, EyeOff } from 'lucide-react'
+import { updateUser } from '../../features/authSlice'
 import api from '../../lib/api'
 
 export default function AdminSettings() {
+  const dispatch = useDispatch()
+  const { user: authUser } = useSelector((s) => s.auth)
   const [tab, setTab] = useState('profile')
   const [profile, setProfile] = useState({ name: '', email: '', phone: '' })
   const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
@@ -11,11 +15,10 @@ export default function AdminSettings() {
   const [msg, setMsg] = useState({ type: '', text: '' })
 
   useEffect(() => {
-    api.get('/auth/me').then(res => {
-      const u = res.data.user
-      setProfile({ name: u.name || '', email: u.email || '', phone: u.phone || '' })
-    })
-  }, [])
+    if (authUser) {
+      setProfile({ name: authUser.name || '', email: authUser.email || '', phone: authUser.phone || '' })
+    }
+  }, [authUser])
 
   const saveProfile = async (e) => {
     e.preventDefault()
@@ -23,7 +26,7 @@ export default function AdminSettings() {
     setLoading(true)
     try {
       const { data } = await api.put('/auth/profile', { name: profile.name, phone: profile.phone })
-      localStorage.setItem('fm_user', JSON.stringify(data.user))
+      dispatch(updateUser(data.user))
       setMsg({ type: 'success', text: 'Profile updated' })
     } catch (err) {
       setMsg({ type: 'error', text: err.response?.data?.message || 'Failed to update' })

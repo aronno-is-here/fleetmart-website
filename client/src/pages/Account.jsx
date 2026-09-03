@@ -1,9 +1,10 @@
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
-import { useState, useEffect } from 'react'
-import { User, Package, MapPin, Heart, LogOut, Check, Truck, Home, CreditCard, Plus, Trash2, Save } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { User, Package, MapPin, Heart, LogOut, Check, Truck, Home, CreditCard, Plus, Trash2, Save, Camera } from 'lucide-react'
 import { fmt } from '../lib/format'
 import { toast } from '../features/uiSlice'
+import { setCredentials, logout as authLogout, updateUser } from '../features/authSlice'
 import api from '../lib/api'
 
 const TABS = [
@@ -22,20 +23,24 @@ export default function Account() {
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const wishCount = useSelector((s) => s.wishlist.length)
+  const { user: authUser, token } = useSelector((s) => s.auth)
 
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [orders, setOrders] = useState([])
   const [ordersLoading, setOrdersLoading] = useState(false)
-  const [loggedOut, setLoggedOut] = useState(false)
 
   const fetchUser = async () => {
+    if (!token) {
+      setLoading(false)
+      return
+    }
     try {
       const { data } = await api.get('/auth/me')
       setUser(data.user)
-      localStorage.setItem('fm_user', JSON.stringify(data.user))
+      dispatch(updateUser(data.user))
     } catch {
-      handleLogout()
+      dispatch(authLogout())
     } finally {
       setLoading(false)
     }
@@ -54,20 +59,23 @@ export default function Account() {
   }
 
   useEffect(() => {
-    fetchUser()
-  }, [])
+    if (token) {
+      fetchUser()
+    } else {
+      setLoading(false)
+    }
+  }, [token])
 
   useEffect(() => {
-    if (tab === 'orders') fetchOrders()
-  }, [tab])
+    if (tab === 'orders' && token) fetchOrders()
+  }, [tab, token])
 
   const handleLogout = async () => {
     try {
       await api.post('/auth/logout')
     } catch {}
-    localStorage.removeItem('fm_token')
-    localStorage.removeItem('fm_user')
-    setLoggedOut(true)
+    dispatch(authLogout())
+    navigate('/')
   }
 
   if (loading) {
@@ -78,7 +86,7 @@ export default function Account() {
     )
   }
 
-  if (loggedOut || !user) {
+  if (!token || !authUser) {
     return (
       <div className="container-fm grid place-items-center py-24 text-center">
         <p className="font-display text-5xl uppercase tracking-wide text-chalk">Subbed off.</p>
@@ -134,6 +142,7 @@ export default function Account() {
 }
 
 function ProfileTab({ user, setUser, dispatch }) {
+  const fileInputRef = useRef(null)
   const [form, setForm] = useState({
     name: user.name || '',
     email: user.email || '',
@@ -142,6 +151,39 @@ function ProfileTab({ user, setUser, dispatch }) {
   const [passwords, setPasswords] = useState({ current: '', newPass: '', confirm: '' })
   const [saving, setSaving] = useState(false)
   const [changingPass, setChangingPass] = useState(false)
+  const [uploading, setUploading] = useState(false)
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) {
+      dispatch(toast({ type: 'error', message: 'Image must be under 5MB' }))
+      return
+    }
+    if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type)) {
+      dispatch(toast({ type: 'error', message: 'Only JPG, PNG, or WebP images allowed' }))
+      return
+    }
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('images', file)
+      const { data } = await api.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      const avatarUrl = data.files?.[0]?.url
+      if (avatarUrl) {
+        const { data: profileData } = await api.put('/auth/profile', { avatar: avatarUrl })
+        setUser(profileData.user)
+        dispatch(updateUser(profileData.user))
+        dispatch(toast({ type: 'success', message: 'Profile image updated!' }))
+      }
+    } catch (err) {
+      dispatch(toast({ type: 'error', message: err.response?.data?.message || 'Upload failed' }))
+    } finally {
+      setUploading(false)
+    }
+  }
 
   const saveProfile = async () => {
     setSaving(true)
@@ -151,7 +193,7 @@ function ProfileTab({ user, setUser, dispatch }) {
         phone: form.phone,
       })
       setUser(data.user)
-      localStorage.setItem('fm_user', JSON.stringify(data.user))
+      dispatch(updateUser(data.user))
       dispatch(toast({ type: 'success', message: 'Profile updated!' }))
     } catch (err) {
       dispatch(toast({ type: 'error', message: err.response?.data?.message || 'Update failed' }))
@@ -185,22 +227,42 @@ function ProfileTab({ user, setUser, dispatch }) {
     <div className="grid gap-6 md:grid-cols-2">
       <div className="border border-line bg-pitch p-6">
         <p className="font-head text-sm font-semibold uppercase tracking-widest text-chalk">Personal Info</p>
-        <div className="mt-4 space-y-4">
-          <div>
-            <label className="mb-1 block text-xs uppercase tracking-widest text-muted">Name</label>
-            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-fm" />
+        <div className="mt-4 flex flex-col items-center gap-4">
+          <div className="relative group">
+            {user.avatar ? (
+              <img src={user.avatar} alt={user.name} className="h-24 w-24 rounded-full object-cover border-2 border-line" />
+            ) : (
+              <div className="h-24 w-24 rounded-full bg-pitch2 border-2 border-line grid place-items-center">
+                <User size={36} className="text-muted" />
+              </div>
+            )}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity grid place-items-center"
+            >
+              <Camera size={20} className="text-chalk" />
+            </button>
+            <input ref={fileInputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={handleAvatarUpload} className="hidden" />
           </div>
-          <div>
-            <label className="mb-1 block text-xs uppercase tracking-widest text-muted">Email</label>
-            <input value={form.email} disabled className="input-fm opacity-60 cursor-not-allowed" />
+          {uploading && <p className="text-xs text-muted">Uploading...</p>}
+          <div className="w-full space-y-4">
+            <div>
+              <label className="mb-1 block text-xs uppercase tracking-widest text-muted">Name</label>
+              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-fm" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs uppercase tracking-widest text-muted">Email</label>
+              <input value={form.email} disabled className="input-fm opacity-60 cursor-not-allowed" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs uppercase tracking-widest text-muted">Phone</label>
+              <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="01XXXXXXXXX" className="input-fm" />
+            </div>
+            <button onClick={saveProfile} disabled={saving} className="btn-volt !py-2.5 !text-xs">
+              <Save size={14} /> {saving ? 'Saving…' : 'Save Changes'}
+            </button>
           </div>
-          <div>
-            <label className="mb-1 block text-xs uppercase tracking-widest text-muted">Phone</label>
-            <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="01XXXXXXXXX" className="input-fm" />
-          </div>
-          <button onClick={saveProfile} disabled={saving} className="btn-volt !py-2.5 !text-xs">
-            <Save size={14} /> {saving ? 'Saving…' : 'Save Changes'}
-          </button>
         </div>
       </div>
 
@@ -291,7 +353,7 @@ function AddressesTab({ user, setUser, dispatch }) {
     try {
       const { data } = await api.put('/auth/addresses', { addresses: addrs })
       setUser(data.user)
-      localStorage.setItem('fm_user', JSON.stringify(data.user))
+      dispatch(updateUser(data.user))
       dispatch(toast({ type: 'success', message: 'Addresses updated!' }))
     } catch (err) {
       dispatch(toast({ type: 'error', message: err.response?.data?.message || 'Update failed' }))
@@ -401,7 +463,7 @@ function BillingTab({ user, setUser, dispatch }) {
     try {
       const { data } = await api.put('/auth/billing', { billing: form })
       setUser(data.user)
-      localStorage.setItem('fm_user', JSON.stringify(data.user))
+      dispatch(updateUser(data.user))
       dispatch(toast({ type: 'success', message: 'Billing info updated!' }))
     } catch (err) {
       dispatch(toast({ type: 'error', message: err.response?.data?.message || 'Update failed' }))

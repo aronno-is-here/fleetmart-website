@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useDispatch, useSelector } from 'react-redux'
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Tag,
   LogOut, Menu, X, Star, Settings,
 } from 'lucide-react'
+import { logout } from '../../features/authSlice'
+import api from '../../lib/api'
 
 const NAV = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -19,20 +22,20 @@ export default function AdminLayout() {
   const [open, setOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
-  const user = JSON.parse(localStorage.getItem('fm_user') || '{}')
-  const token = localStorage.getItem('fm_token')
+  const dispatch = useDispatch()
+  const { user, token } = useSelector((s) => s.auth)
 
-  const logout = () => {
-    localStorage.removeItem('fm_token')
-    localStorage.removeItem('fm_user')
+  const logoutHandler = async () => {
+    try { await api.post('/auth/logout') } catch {}
+    dispatch(logout())
     navigate('/admin/login')
   }
 
   useEffect(() => {
-    if (location.pathname !== '/admin/login' && (!token || user.role !== 'admin')) {
+    if (location.pathname !== '/admin/login' && (!token || user?.role !== 'admin')) {
       navigate('/admin/login')
     }
-  }, [location.pathname, token, user.role, navigate])
+  }, [location.pathname, token, user?.role, navigate])
 
   if (location.pathname === '/admin/login') return <Outlet />
 
@@ -60,7 +63,7 @@ export default function AdminLayout() {
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-line">
-          <button onClick={logout} className="flex items-center gap-3 px-3 py-2.5 text-sm font-head text-muted hover:text-ember transition-colors w-full">
+          <button onClick={logoutHandler} className="flex items-center gap-3 px-3 py-2.5 text-sm font-head text-muted hover:text-ember transition-colors w-full">
             <LogOut size={18} />
             Logout
           </button>
@@ -78,7 +81,7 @@ export default function AdminLayout() {
           </button>
           <div className="flex-1" />
           <div className="text-sm font-head text-muted">
-            {user.name || 'Admin'}
+            {user?.name || 'Admin'}
           </div>
         </header>
 

@@ -1,4 +1,6 @@
 import axios from 'axios'
+import { store } from '../store'
+import { logout } from '../features/authSlice'
 
 const api = axios.create({
   baseURL: '/api',
@@ -7,7 +9,7 @@ const api = axios.create({
 })
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('fm_token')
+  const token = store.getState().auth.token
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
@@ -16,10 +18,9 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      const token = localStorage.getItem('fm_token')
+      const token = store.getState().auth.token
       if (token && !err.config?.url?.includes('/auth/login') && !err.config?.url?.includes('/auth/register')) {
-        localStorage.removeItem('fm_token')
-        localStorage.removeItem('fm_user')
+        store.dispatch(logout())
         if (window.location.pathname.startsWith('/admin')) {
           window.location.href = '/admin/login'
         } else if (window.location.pathname !== '/login') {

@@ -28,7 +28,7 @@ export default function Checkout() {
   const [orderId, setOrderId] = useState('')
   const [addr, setAddr] = useState({ name: '', phone: '', street: '', city: 'Dhaka', zip: '' })
 
-  const token = localStorage.getItem('fm_token')
+  const { token } = useSelector((s) => s.auth)
 
   useEffect(() => {
     if (!token) {
