@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux'
 import { motion } from 'framer-motion'
 import { ArrowRight, ChevronLeft, ChevronRight, Timer, Quote } from 'lucide-react'
 import { CATEGORIES, TEAMS } from '../data/products'
-import { ProductArt, JerseyArt } from '../components/ProductArt'
+import { ProductArt, JerseyArt, BootArt } from '../components/ProductArt'
 import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
 import SectionHeading from '../components/ui/SectionHeading'
 import { fmt } from '../lib/format'
@@ -83,7 +83,9 @@ function Hero() {
               <JerseyArt primary={s.team.primary} secondary={s.team.secondary} number="10" name="FLEET" view="front" />
             </div>
           ) : (
-            <div className="flex items-center justify-center h-80 text-muted font-head text-sm">BOOTS</div>
+            <div className="animate-fadeUp">
+              <BootArt primary="#C6F53F" secondary="#0A0E13" />
+            </div>
           )}
           <div className="absolute -right-2 top-6 border border-volt/40 bg-night/85 px-4 py-2 backdrop-blur sm:-right-6">
             <p className="font-head text-xs uppercase tracking-[0.2em] text-muted">From</p>
