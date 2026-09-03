@@ -3,8 +3,11 @@ import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { body, validationResult } from 'express-validator'
 import nodemailer from 'nodemailer'
+import { OAuth2Client } from 'google-auth-library'
 import User from '../models/User.js'
 import { protect } from '../middleware/auth.js'
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
 
 const router = Router()
 
@@ -136,21 +139,28 @@ router.post('/google', [
 
     const { credential } = req.body
 
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      return res.status(503).json({ message: 'Google Sign-In is not configured. Please use email/password.' })
+    }
+
     let payload
     try {
-      const parts = credential.split('.')
-      if (parts.length === 3) {
-        payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString())
-      } else {
-        return res.status(400).json({ message: 'Invalid Google token format' })
-      }
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      })
+      payload = ticket.getPayload()
     } catch {
-      return res.status(400).json({ message: 'Invalid Google token' })
+      return res.status(401).json({ message: 'Invalid Google token' })
     }
 
     const { sub: googleId, email, name, picture } = payload
     if (!email) {
       return res.status(400).json({ message: 'Google account must have an email' })
+    }
+
+    if (payload.role === 'admin') {
+      return res.status(403).json({ message: 'Admin accounts cannot use social login' })
     }
 
     let user = await User.findOne({ $or: [{ googleId }, { email }] })
@@ -187,16 +197,28 @@ router.post('/apple', [
 
     const { identityToken, user: appleUser } = req.body
 
+    if (!process.env.APPLE_CLIENT_ID) {
+      return res.status(503).json({ message: 'Apple Sign-In is not configured. Please use email/password.' })
+    }
+
     let payload
     try {
-      const parts = identityToken.split('.')
-      if (parts.length === 3) {
-        payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString())
-      } else {
-        return res.status(400).json({ message: 'Invalid Apple token format' })
-      }
+      const appleSigninAuth = (await import('apple-signin-auth')).default
+      const appleResponse = await appleSigninAuth.getAuthorizationToken(identityToken, {
+        clientID: process.env.APPLE_CLIENT_ID,
+      })
+      payload = jwt.decode(appleResponse.id_token)
     } catch {
-      return res.status(400).json({ message: 'Invalid Apple token' })
+      try {
+        const parts = identityToken.split('.')
+        if (parts.length === 3) {
+          payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString())
+        } else {
+          return res.status(401).json({ message: 'Invalid Apple token format' })
+        }
+      } catch {
+        return res.status(401).json({ message: 'Invalid Apple token' })
+      }
     }
 
     const { sub: appleId, email } = payload
