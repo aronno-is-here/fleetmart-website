@@ -22,6 +22,7 @@ import reviewRoutes from './routes/reviews.js'
 import couponRoutes from './routes/coupons.js'
 import adminRoutes from './routes/admin.js'
 import uploadRoutes from './routes/upload.js'
+import paymentRoutes from './routes/payment.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -106,6 +107,7 @@ app.use('/api/reviews', reviewRoutes)
 app.use('/api/coupons', couponRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/upload', uploadRoutes)
+app.use('/api/payment', paymentRoutes)
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
 
