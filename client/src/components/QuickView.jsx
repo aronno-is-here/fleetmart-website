@@ -42,9 +42,9 @@ export default function QuickView() {
   }
 
   return (
-    <div className="fixed inset-0 z-[80] grid place-items-center bg-night/90 dark:bg-night/90 bg-black/50 p-4 backdrop-blur-md" onClick={close}>
-      <div className="relative grid w-full max-w-3xl border border-line bg-pitch dark:bg-pitch bg-white shadow-card animate-fadeUp md:grid-cols-2" onClick={(e) => e.stopPropagation()}>
-        <button onClick={close} aria-label="Close quick view" className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center border border-line bg-night/70 dark:bg-night/70 bg-gray-200/70 text-muted backdrop-blur hover:text-chalk">
+    <div className="fixed inset-0 z-[80] grid place-items-center bg-night/90 p-4 backdrop-blur-md" onClick={close}>
+        <div className="relative grid w-full max-w-3xl border border-line bg-pitch shadow-card animate-fadeUp md:grid-cols-2" onClick={(e) => e.stopPropagation()}>
+        <button onClick={close} aria-label="Close quick view" className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center border border-line bg-night/70 text-muted backdrop-blur hover:text-chalk">
           <X size={16} />
         </button>
 

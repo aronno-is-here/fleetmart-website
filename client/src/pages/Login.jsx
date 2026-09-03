@@ -10,7 +10,7 @@ export function AuthShell({ title, sub, children }) {
     <div className="container-fm grid gap-12 py-16 lg:grid-cols-2 lg:items-center">
       <div className="hidden lg:block">
         <p className="eyebrow mb-4">Fleetmart Members</p>
-        <h2 className="font-display text-7xl leading-[0.9] tracking-wide text-chalk dark:text-chalk text-gray-900">
+        <h2 className="font-display text-7xl leading-[0.9] tracking-wide text-chalk">
           JOIN THE<br /><span className="text-volt">STARTING XI</span>
         </h2>
         <ul className="mt-8 space-y-3 text-sm text-muted">
@@ -19,8 +19,8 @@ export function AuthShell({ title, sub, children }) {
           ))}
         </ul>
       </div>
-      <div className="mx-auto w-full max-w-md border border-line bg-pitch dark:bg-pitch bg-white p-8">
-        <h1 className="font-display text-4xl uppercase tracking-wide text-chalk dark:text-chalk text-gray-900">{title}</h1>
+      <div className="mx-auto w-full max-w-md border border-line bg-pitch p-8">
+        <h1 className="font-display text-4xl uppercase tracking-wide text-chalk">{title}</h1>
         <p className="mt-1 mb-6 text-sm text-muted">{sub}</p>
         {children}
       </div>

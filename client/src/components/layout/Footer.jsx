@@ -15,7 +15,7 @@ export default function Footer() {
   const [done, setDone] = useState(false)
 
   return (
-    <footer className="border-t border-line bg-pitch dark:bg-pitch bg-gray-50">
+    <footer className="border-t border-line bg-pitch">
       {/* Trust strip */}
       <div className="border-b border-line">
         <div className="container-fm grid grid-cols-2 gap-6 py-8 md:grid-cols-4">
@@ -28,7 +28,7 @@ export default function Footer() {
             <div key={t.title} className="flex items-center gap-3">
               {t.icon}
               <div>
-                <p className="font-head text-sm font-semibold uppercase tracking-wider text-chalk dark:text-chalk text-gray-900">{t.title}</p>
+                <p className="font-head text-sm font-semibold uppercase tracking-wider text-chalk">{t.title}</p>
                 <p className="text-xs text-muted">{t.sub}</p>
               </div>
             </div>
@@ -42,7 +42,7 @@ export default function Footer() {
             <span className="grid h-8 w-8 place-items-center bg-volt">
               <Zap size={18} className="fill-night text-night" />
             </span>
-            <span className="font-display text-3xl tracking-wider text-chalk dark:text-chalk text-gray-900">FLEET<span className="text-volt">MART</span></span>
+            <span className="font-display text-3xl tracking-wider text-chalk">FLEET<span className="text-volt">MART</span></span>
           </Link>
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted">
             Bangladesh's home ground for football gear. Premium jerseys, boots and equipment — with custom name & number printing that hits different.
@@ -74,7 +74,7 @@ export default function Footer() {
         </div>
 
         <div>
-          <p className="font-head text-sm font-semibold uppercase tracking-[0.2em] text-chalk dark:text-chalk text-gray-900">Shop</p>
+          <p className="font-head text-sm font-semibold uppercase tracking-[0.2em] text-chalk">Shop</p>
           <ul className="mt-4 space-y-2.5">
             {CATEGORIES.map((c) => (
               <li key={c.id}>
@@ -85,7 +85,7 @@ export default function Footer() {
         </div>
 
         <div>
-          <p className="font-head text-sm font-semibold uppercase tracking-[0.2em] text-chalk dark:text-chalk text-gray-900">Support</p>
+          <p className="font-head text-sm font-semibold uppercase tracking-[0.2em] text-chalk">Support</p>
           <ul className="mt-4 space-y-2.5">
             {[
               ['Track Order', '/account/orders'],
@@ -102,7 +102,7 @@ export default function Footer() {
         </div>
 
         <div>
-          <p className="font-head text-sm font-semibold uppercase tracking-[0.2em] text-chalk dark:text-chalk text-gray-900">Company</p>
+          <p className="font-head text-sm font-semibold uppercase tracking-[0.2em] text-chalk">Company</p>
           <ul className="mt-4 space-y-2.5">
             {[
               ['About Us', '/about'],

@@ -17,9 +17,6 @@ export default {
         gold: '#E8C36A',
         azure: '#3FA9F5',
         snow: '#F5F7F4',
-        // Light theme semantic colors
-        surface: { DEFAULT: '#FFFFFF', secondary: '#F8F9FA', tertiary: '#F0F2F5' },
-        text: { DEFAULT: '#1A1D21', secondary: '#5F6B7A', muted: '#8A98A6' },
       },
       fontFamily: {
         display: ['"Bebas Neue"', 'Impact', 'sans-serif'],
@@ -58,7 +55,6 @@ export default {
       boxShadow: {
         volt: '0 0 0 1px rgba(198,245,63,0.35), 0 8px 30px -6px rgba(198,245,63,0.25)',
         card: '0 10px 40px -12px rgba(0,0,0,0.55)',
-        'card-light': '0 10px 40px -12px rgba(0,0,0,0.1)',
       },
     },
   },
