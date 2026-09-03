@@ -30,6 +30,16 @@ export default function AdminUsers() {
     load(page)
   }
 
+  const deleteUser = async (id, name) => {
+    if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return
+    try {
+      await api.delete(`/admin/users/${id}`)
+      load(page)
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to delete user')
+    }
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-display tracking-wider text-chalk">Users</h1>
@@ -73,6 +83,11 @@ export default function AdminUsers() {
                     <button onClick={() => toggleActive(u._id, u.isActive)} className="text-xs font-head text-muted hover:text-ember px-2 py-1 bg-pitch2 rounded">
                       {u.isActive ? 'Block' : 'Unblock'}
                     </button>
+                    {u.role !== 'admin' && (
+                      <button onClick={() => deleteUser(u._id, u.name)} className="text-xs font-head text-ember hover:text-red-400 px-2 py-1 bg-ember/10 rounded">
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

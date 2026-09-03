@@ -20,7 +20,9 @@ api.interceptors.response.use(
       if (token && !err.config?.url?.includes('/auth/login') && !err.config?.url?.includes('/auth/register')) {
         localStorage.removeItem('fm_token')
         localStorage.removeItem('fm_user')
-        if (window.location.pathname !== '/login') {
+        if (window.location.pathname.startsWith('/admin')) {
+          window.location.href = '/admin/login'
+        } else if (window.location.pathname !== '/login') {
           window.location.href = '/login'
         }
       }

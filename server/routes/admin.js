@@ -91,6 +91,17 @@ router.put('/users/:id', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// DELETE /api/admin/users/:id
+router.delete('/users/:id', async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id)
+    if (!user) return res.status(404).json({ message: 'User not found' })
+    if (user.role === 'admin') return res.status(400).json({ message: 'Cannot delete admin user' })
+    await User.findByIdAndDelete(req.params.id)
+    res.json({ message: 'User deleted' })
+  } catch (err) { next(err) }
+})
+
 // GET /api/admin/reviews
 router.get('/reviews', async (req, res, next) => {
   try {
