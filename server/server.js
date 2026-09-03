@@ -91,8 +91,8 @@ app.use('/api/upload', uploadRoutes)
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
 
-// Serve React build in production
-if (process.env.NODE_ENV === 'production') {
+// Serve React build in production (non-Vercel only)
+if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
   const clientDist = path.join(__dirname, '..', 'client', 'dist')
   app.use(express.static(clientDist))
   app.get('*', (_req, res) => {
@@ -114,7 +114,11 @@ process.on('uncaughtException', (err) => {
 
 // Start
 const start = async () => {
-  await connectDB()
+  try {
+    await connectDB()
+  } catch (err) {
+    console.error('Database connection failed:', err.message)
+  }
   if (!process.env.VERCEL) {
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
   }
