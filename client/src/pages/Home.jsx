@@ -59,7 +59,7 @@ function Hero() {
         <div className="absolute bottom-0 left-1/2 h-56 w-[420px] -translate-x-1/2 border-2 border-b-0 border-chalk" />
       </div>
 
-      <div className="container-fm relative grid items-center gap-10 py-14 lg:grid-cols-2 lg:py-20">
+      <div className="container-fm relative grid min-h-[520px] items-center gap-10 py-14 lg:grid-cols-2 lg:py-20">
         <motion.div key={idx} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: 'easeOut' }}>
           <p className="eyebrow mb-4">{s.eyebrow}</p>
           <h1 className="whitespace-pre-line font-display text-7xl leading-[0.9] tracking-wide text-chalk sm:text-8xl lg:text-9xl">
