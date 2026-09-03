@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Tag,
@@ -27,12 +27,13 @@ export default function AdminLayout() {
     navigate('/admin/login')
   }
 
-  if (location.pathname === '/admin/login') return <Outlet />
+  useEffect(() => {
+    if (location.pathname !== '/admin/login' && (!token || user.role !== 'admin')) {
+      navigate('/admin/login')
+    }
+  }, [location.pathname, token, user.role, navigate])
 
-  if (!token || user.role !== 'admin') {
-    navigate('/admin/login')
-    return null
-  }
+  if (location.pathname === '/admin/login') return <Outlet />
 
   return (
     <div className="flex h-screen bg-night">
