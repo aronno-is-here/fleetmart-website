@@ -5,7 +5,7 @@ A premium, high-energy football jersey & sports equipment e-commerce platform (M
 **Storefront** — dark "pitch" aesthetic, volt-green accents, Bebas Neue display type, animated product experiences (jersey customizer with live preview, quick-view, compare, fly-to-cart).
 
 ## Stack
-- **Client:** React 18 (Vite) · Tailwind CSS · Redux Toolkit · React Router · Framer Motion
+- **Client:** React 19 (Vite) · Tailwind CSS · Redux Toolkit · React Router · Framer Motion
 - **Server:** Node.js · Express · MongoDB (Mongoose) · JWT auth
 - **Payments:** COD + gateway abstraction (SSLCommerz/bKash ready)
 
