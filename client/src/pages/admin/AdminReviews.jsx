@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Trash2, Eye, EyeOff } from 'lucide-react'
+import { Trash2, Eye, EyeOff, BadgeCheck } from 'lucide-react'
 import api from '../../lib/api'
 
 export default function AdminReviews() {
@@ -38,10 +38,10 @@ export default function AdminReviews() {
           <thead>
             <tr className="border-b border-line text-left">
               <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Product</th>
-              <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">User</th>
+              <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Reviewer</th>
               <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Rating</th>
               <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Comment</th>
-              <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Visible</th>
+              <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Status</th>
               <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Actions</th>
             </tr>
           </thead>
@@ -51,20 +51,35 @@ export default function AdminReviews() {
                 <td className="px-4 py-3">
                   <div className="text-chalk">{r.product?.name}</div>
                 </td>
-                <td className="px-4 py-3 text-muted">{r.user?.name}</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="grid h-8 w-8 place-items-center bg-volt/15 font-display text-sm text-volt">{r.reviewerName?.[5] || '?'}</span>
+                    <div>
+                      <div className="text-chalk text-sm">{r.reviewerName || 'Anonymous'}</div>
+                      <div className="text-xs text-muted">{r.user?.email}</div>
+                    </div>
+                  </div>
+                </td>
                 <td className="px-4 py-3 text-gold">{stars(r.rating)}</td>
                 <td className="px-4 py-3 text-muted max-w-xs truncate">{r.comment}</td>
                 <td className="px-4 py-3">
-                  <span className={`text-[10px] font-head uppercase px-2 py-0.5 rounded ${r.isVisible ? 'bg-green-500/20 text-green-400' : 'bg-ember/20 text-ember'}`}>
-                    {r.isVisible ? 'Visible' : 'Hidden'}
-                  </span>
+                  <div className="flex flex-col gap-1">
+                    <span className={`text-[10px] font-head uppercase px-2 py-0.5 ${r.isVisible ? 'bg-green-500/20 text-green-400' : 'bg-ember/20 text-ember'}`}>
+                      {r.isVisible ? 'Visible' : 'Hidden'}
+                    </span>
+                    {r.verifiedPurchase && (
+                      <span className="text-[10px] font-head uppercase px-2 py-0.5 bg-azure/20 text-azure flex items-center gap-1">
+                        <BadgeCheck size={10} /> Verified
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex gap-2">
-                    <button onClick={() => toggleVisibility(r._id, r.isVisible)} className="text-muted hover:text-volt">
+                    <button onClick={() => toggleVisibility(r._id, r.isVisible)} className="text-muted hover:text-volt" title={r.isVisible ? 'Hide' : 'Show'}>
                       {r.isVisible ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
-                    <button onClick={() => remove(r._id)} className="text-muted hover:text-ember"><Trash2 size={16} /></button>
+                    <button onClick={() => remove(r._id)} className="text-muted hover:text-ember" title="Delete"><Trash2 size={16} /></button>
                   </div>
                 </td>
               </tr>

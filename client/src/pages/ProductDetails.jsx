@@ -355,9 +355,9 @@ export default function ProductDetails() {
                 <li key={r._id} className="border border-line bg-pitch p-5">
                   <div className="flex items-center justify-between">
                     <p className="flex items-center gap-3">
-                      <span className="grid h-9 w-9 place-items-center bg-volt/15 font-display text-volt">{r.user?.name?.[0] || '?'}</span>
+                      <span className="grid h-9 w-9 place-items-center bg-volt/15 font-display text-volt">{r.reviewerName?.[5] || '?'}</span>
                       <span>
-                        <span className="block font-head text-sm font-semibold uppercase tracking-wide text-chalk">{r.user?.name || 'Anonymous'}</span>
+                        <span className="block font-head text-sm font-semibold uppercase tracking-wide text-chalk">{r.reviewerName || 'Anonymous'}</span>
                         <span className="text-xs text-muted">{new Date(r.createdAt).toLocaleDateString()}</span>
                       </span>
                     </p>

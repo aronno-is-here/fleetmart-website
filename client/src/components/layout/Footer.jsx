@@ -92,6 +92,7 @@ export default function Footer() {
               ['Shipping Info', '/policies/shipping'],
               ['Returns & Refunds', '/policies/returns'],
               ['FAQ', '/faq'],
+              ['Help Center', '/support'],
               ['Contact Us', '/contact'],
             ].map(([label, to]) => (
               <li key={label}>

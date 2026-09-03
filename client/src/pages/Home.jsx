@@ -319,21 +319,29 @@ function Stats() {
   )
 }
 
-const REVIEWS = [
-  { name: 'Tanvir A.', role: 'Sunday League Captain', text: 'Ordered 14 customized jerseys for my team on Tuesday, wore them Saturday. The volt print on midnight navy is unreal in person.', rating: 5 },
-  { name: 'Sadia R.', role: 'Turf Regular', text: 'The Academy Turf boots grip wet artificial grass better than boots triple the price. Fleetmart gets the Dhaka turf scene.', rating: 5 },
-  { name: 'Rafi H.', role: 'Retro Collector', text: 'That Crimson 94 reissue is faithful to the last stitch. Packaging, authenticity card, everything premium.', rating: 4 },
+const FALLBACK_REVIEWS = [
+  { reviewerName: 'User_1110217', comment: 'Ordered 14 customized jerseys for my team on Tuesday, wore them Saturday. The volt print on midnight navy is unreal in person.', rating: 5 },
+  { reviewerName: 'User_7348291', comment: 'The Academy Turf boots grip wet artificial grass better than boots triple the price. Fleetmart gets the Dhaka turf scene.', rating: 5 },
+  { reviewerName: 'User_5029384', comment: 'That Crimson 94 reissue is faithful to the last stitch. Packaging, authenticity card, everything premium.', rating: 4 },
 ]
 
 function Testimonials() {
+  const [reviews, setReviews] = useState(FALLBACK_REVIEWS)
+
+  useEffect(() => {
+    api.get('/reviews/featured').then(({ data }) => {
+      if (data.reviews?.length > 0) setReviews(data.reviews)
+    }).catch(() => {})
+  }, [])
+
   return (
     <section className="border-y border-line bg-pitch/40 py-16">
       <div className="container-fm">
         <SectionHeading eyebrow="From the stands" title="What the Squad Says" />
         <div className="grid gap-4 md:grid-cols-3">
-          {REVIEWS.map((r, i) => (
+          {reviews.slice(0, 3).map((r, i) => (
             <motion.figure
-              key={r.name}
+              key={r._id || r.reviewerName}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -341,12 +349,12 @@ function Testimonials() {
               className="relative border border-line bg-pitch p-6"
             >
               <Quote size={28} className="absolute right-5 top-5 text-volt/20" />
-              <blockquote className="text-sm leading-relaxed text-chalk/90">"{r.text}"</blockquote>
+              <blockquote className="text-sm leading-relaxed text-chalk/90">"{r.comment}"</blockquote>
               <figcaption className="mt-5 flex items-center gap-3">
-                <span className="grid h-10 w-10 place-items-center bg-volt/15 font-display text-lg text-volt">{r.name[0]}</span>
+                <span className="grid h-10 w-10 place-items-center bg-volt/15 font-display text-lg text-volt">{r.reviewerName?.[5] || '?'}</span>
                 <span>
-                  <span className="block font-head text-sm font-semibold uppercase tracking-wide text-chalk">{r.name}</span>
-                  <span className="block text-xs text-muted">{r.role}</span>
+                  <span className="block font-head text-sm font-semibold uppercase tracking-wide text-chalk">{r.reviewerName}</span>
+                  {r.product?.name && <span className="block text-xs text-muted">{r.product.name}</span>}
                 </span>
                 <span className="ml-auto text-gold">{'★'.repeat(r.rating)}<span className="text-line">{'★'.repeat(5 - r.rating)}</span></span>
               </figcaption>

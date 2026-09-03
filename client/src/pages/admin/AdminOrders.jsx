@@ -4,6 +4,7 @@ import api from '../../lib/api'
 const fmt = (n) => `৳${Number(n).toLocaleString()}`
 
 const STATUS = ['processing', 'confirmed', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'returned']
+const PAYMENT_STATUS = ['pending', 'partial', 'paid', 'failed', 'cancelled']
 const statusColors = {
   processing: 'bg-gold/20 text-gold',
   confirmed: 'bg-azure/20 text-azure',
@@ -12,6 +13,13 @@ const statusColors = {
   delivered: 'bg-green-500/20 text-green-400',
   cancelled: 'bg-ember/20 text-ember',
   returned: 'bg-ember/20 text-ember',
+}
+const paymentStatusColors = {
+  pending: 'bg-gold/20 text-gold',
+  partial: 'bg-orange-500/20 text-orange-400',
+  paid: 'bg-green-500/20 text-green-400',
+  failed: 'bg-ember/20 text-ember',
+  cancelled: 'bg-ember/20 text-ember',
 }
 
 export default function AdminOrders() {
@@ -43,6 +51,13 @@ export default function AdminOrders() {
     setUpdating(null)
   }
 
+  const updatePayment = async (id, paymentStatus) => {
+    setUpdating(id)
+    await api.put(`/orders/${id}/status`, { paymentStatus })
+    load(page)
+    setUpdating(null)
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -61,6 +76,9 @@ export default function AdminOrders() {
               <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Customer</th>
               <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Items</th>
               <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Total</th>
+              <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Payment Type</th>
+              <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Paid</th>
+              <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Remaining</th>
               <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Payment</th>
               <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Status</th>
               <th className="px-4 py-3 font-head text-xs uppercase tracking-widest text-muted">Actions</th>
@@ -71,18 +89,30 @@ export default function AdminOrders() {
               <tr key={o._id} className="border-b border-line hover:bg-pitch2/50">
                 <td className="px-4 py-3 font-head text-chalk">{o.orderId}</td>
                 <td className="px-4 py-3">
-                  <div className="text-chalk">{o.user?.name}</div>
-                  <div className="text-xs text-muted">{o.user?.email}</div>
+                  <div className="text-chalk">{o.user?.name || o.guestName || 'Guest'}</div>
+                  <div className="text-xs text-muted">{o.user?.email || o.guestEmail}</div>
                 </td>
                 <td className="px-4 py-3 text-muted">{o.items?.length || 0}</td>
                 <td className="px-4 py-3 text-chalk">{fmt(o.total)}</td>
                 <td className="px-4 py-3">
-                  <span className={`text-[10px] font-head uppercase px-2 py-0.5 rounded ${o.paymentStatus === 'paid' ? 'bg-green-500/20 text-green-400' : 'bg-gold/20 text-gold'}`}>
-                    {o.paymentStatus}
+                  <span className={`text-[10px] font-head uppercase px-2 py-0.5 ${o.paymentType === 'full' ? 'bg-azure/20 text-azure' : 'bg-orange-500/20 text-orange-400'}`}>
+                    {o.paymentType === 'full' ? 'Full' : `Partial (${fmt(o.amountPaid || 0)})`}
                   </span>
                 </td>
+                <td className="px-4 py-3 text-volt font-semibold">{fmt(o.amountPaid || 0)}</td>
+                <td className="px-4 py-3 text-muted">{fmt(o.remainingAmount || 0)}</td>
                 <td className="px-4 py-3">
-                  <span className={`text-[10px] font-head uppercase px-2 py-0.5 rounded ${statusColors[o.orderStatus] || ''}`}>
+                  <select
+                    value={o.paymentStatus}
+                    onChange={e => updatePayment(o._id, e.target.value)}
+                    disabled={updating === o._id}
+                    className={`bg-pitch2 border border-line px-2 py-1 text-xs text-chalk ${paymentStatusColors[o.paymentStatus] || ''}`}
+                  >
+                    {PAYMENT_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`text-[10px] font-head uppercase px-2 py-0.5 ${statusColors[o.orderStatus] || ''}`}>
                     {o.orderStatus?.replace('_', ' ')}
                   </span>
                 </td>

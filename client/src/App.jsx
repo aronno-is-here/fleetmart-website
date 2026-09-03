@@ -13,6 +13,7 @@ import Account from './pages/Account'
 import Wishlist from './pages/Wishlist'
 import About from './pages/About'
 import Contact from './pages/Contact'
+import Support from './pages/Support'
 import Faq from './pages/Faq'
 import Policy from './pages/Policy'
 import NotFound from './pages/NotFound'
@@ -35,14 +36,7 @@ const router = createBrowserRouter([
       { path: '/shop', element: <Shop /> },
       { path: '/product/:slug', element: <ProductDetails /> },
       { path: '/cart', element: <Cart /> },
-      {
-        path: '/checkout',
-        element: (
-          <ProtectedRoute>
-            <Checkout />
-          </ProtectedRoute>
-        ),
-      },
+      { path: '/checkout', element: <Checkout /> },
       { path: '/order/success', element: <OrderSuccess /> },
       { path: '/login', element: <Login /> },
       { path: '/register', element: <Register /> },
@@ -66,6 +60,7 @@ const router = createBrowserRouter([
       { path: '/account/wishlist', element: <Wishlist /> },
       { path: '/about', element: <About /> },
       { path: '/contact', element: <Contact /> },
+      { path: '/support', element: <Support /> },
       { path: '/faq', element: <Faq /> },
       { path: '/policies/:slug', element: <Policy /> },
       { path: '*', element: <NotFound /> },
