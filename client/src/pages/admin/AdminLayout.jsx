@@ -3,7 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Tag,
-  LogOut, Menu, X, Star, Settings,
+  LogOut, Menu, X, Star, Settings, BarChart3,
 } from 'lucide-react'
 import { logout } from '../../features/authSlice'
 import api from '../../lib/api'
@@ -15,6 +15,7 @@ const NAV = [
   { to: '/admin/users', label: 'Users', icon: Users },
   { to: '/admin/coupons', label: 'Coupons', icon: Tag },
   { to: '/admin/reviews', label: 'Reviews', icon: Star },
+  { to: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/admin/settings', label: 'Settings', icon: Settings },
 ]
 

@@ -21,6 +21,7 @@ import orderRoutes from './routes/orders.js'
 import reviewRoutes from './routes/reviews.js'
 import couponRoutes from './routes/coupons.js'
 import adminRoutes from './routes/admin.js'
+import analyticsRoutes from './routes/analytics.js'
 import uploadRoutes from './routes/upload.js'
 import paymentRoutes from './routes/payment.js'
 
@@ -106,6 +107,7 @@ app.use('/api/orders', orderRoutes)
 app.use('/api/reviews', reviewRoutes)
 app.use('/api/coupons', couponRoutes)
 app.use('/api/admin', adminRoutes)
+app.use('/api/admin', analyticsRoutes)
 app.use('/api/upload', uploadRoutes)
 app.use('/api/payment', paymentRoutes)
 

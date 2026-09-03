@@ -26,6 +26,7 @@ import AdminOrders from './pages/admin/AdminOrders'
 import AdminUsers from './pages/admin/AdminUsers'
 import AdminCoupons from './pages/admin/AdminCoupons'
 import AdminReviews from './pages/admin/AdminReviews'
+import AdminAnalytics from './pages/admin/AdminAnalytics'
 import AdminSettings from './pages/admin/AdminSettings'
 
 const router = createBrowserRouter([
@@ -77,6 +78,7 @@ const router = createBrowserRouter([
       { path: 'users', element: <AdminUsers /> },
       { path: 'coupons', element: <AdminCoupons /> },
       { path: 'reviews', element: <AdminReviews /> },
+      { path: 'analytics', element: <AdminAnalytics /> },
       { path: 'settings', element: <AdminSettings /> },
     ],
   },
