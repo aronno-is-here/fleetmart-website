@@ -57,7 +57,7 @@ export default function Wishlist() {
             <div key={p._id} className="flex flex-wrap items-center gap-5 border border-line bg-pitch p-4">
               <Link to={`/product/${p.slug}`} className="h-20 w-20 shrink-0 border border-line bg-night overflow-hidden">
                 {p.images?.[0] ? (
-                  <img src={p.images[0].url} alt={p.name} className="w-full h-full object-cover" />
+                  <img src={p.images[0].url} alt={p.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                 ) : (
                   <ProductArt product={p} />
                 )}

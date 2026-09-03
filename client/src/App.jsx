@@ -1,52 +1,70 @@
+import { lazy, Suspense } from 'react'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import StoreLayout from './layouts/StoreLayout'
-import Home from './pages/Home'
-import Shop from './pages/Shop'
-import ProductDetails from './pages/ProductDetails'
-import Cart from './pages/Cart'
-import Checkout from './pages/Checkout'
-import OrderSuccess from './pages/OrderSuccess'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import ForgotPassword from './pages/ForgotPassword'
-import Account from './pages/Account'
-import Wishlist from './pages/Wishlist'
-import About from './pages/About'
-import Contact from './pages/Contact'
-import Support from './pages/Support'
-import Faq from './pages/Faq'
-import Policy from './pages/Policy'
-import NotFound from './pages/NotFound'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminLayout from './pages/admin/AdminLayout'
-import AdminLogin from './pages/admin/AdminLogin'
-import Dashboard from './pages/admin/Dashboard'
-import AdminProducts from './pages/admin/AdminProducts'
-import AdminOrders from './pages/admin/AdminOrders'
-import AdminUsers from './pages/admin/AdminUsers'
-import AdminCoupons from './pages/admin/AdminCoupons'
-import AdminReviews from './pages/admin/AdminReviews'
-import AdminAnalytics from './pages/admin/AdminAnalytics'
-import AdminSettings from './pages/admin/AdminSettings'
+
+const Home = lazy(() => import('./pages/Home'))
+const Shop = lazy(() => import('./pages/Shop'))
+const ProductDetails = lazy(() => import('./pages/ProductDetails'))
+const Cart = lazy(() => import('./pages/Cart'))
+const Checkout = lazy(() => import('./pages/Checkout'))
+const OrderSuccess = lazy(() => import('./pages/OrderSuccess'))
+const Login = lazy(() => import('./pages/Login'))
+const Register = lazy(() => import('./pages/Register'))
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
+const Account = lazy(() => import('./pages/Account'))
+const Wishlist = lazy(() => import('./pages/Wishlist'))
+const About = lazy(() => import('./pages/About'))
+const Contact = lazy(() => import('./pages/Contact'))
+const Support = lazy(() => import('./pages/Support'))
+const Faq = lazy(() => import('./pages/Faq'))
+const Policy = lazy(() => import('./pages/Policy'))
+const NotFound = lazy(() => import('./pages/NotFound'))
+const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'))
+const Dashboard = lazy(() => import('./pages/admin/Dashboard'))
+const AdminProducts = lazy(() => import('./pages/admin/AdminProducts'))
+const AdminOrders = lazy(() => import('./pages/admin/AdminOrders'))
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'))
+const AdminCoupons = lazy(() => import('./pages/admin/AdminCoupons'))
+const AdminReviews = lazy(() => import('./pages/admin/AdminReviews'))
+const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics'))
+const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'))
+
+function Loading() {
+  return (
+    <div className="grid h-64 place-items-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-volt border-t-transparent" />
+    </div>
+  )
+}
+
+function withSuspense(Component) {
+  return (
+    <Suspense fallback={<Loading />}>
+      <Component />
+    </Suspense>
+  )
+}
 
 const router = createBrowserRouter([
   {
     element: <StoreLayout />,
     children: [
-      { path: '/', element: <Home /> },
-      { path: '/shop', element: <Shop /> },
-      { path: '/product/:slug', element: <ProductDetails /> },
-      { path: '/cart', element: <Cart /> },
-      { path: '/checkout', element: <Checkout /> },
-      { path: '/order/success', element: <OrderSuccess /> },
-      { path: '/login', element: <Login /> },
-      { path: '/register', element: <Register /> },
-      { path: '/forgot-password', element: <ForgotPassword /> },
+      { path: '/', element: withSuspense(Home) },
+      { path: '/shop', element: withSuspense(Shop) },
+      { path: '/product/:slug', element: withSuspense(ProductDetails) },
+      { path: '/cart', element: withSuspense(Cart) },
+      { path: '/checkout', element: withSuspense(Checkout) },
+      { path: '/order/success', element: withSuspense(OrderSuccess) },
+      { path: '/login', element: withSuspense(Login) },
+      { path: '/register', element: withSuspense(Register) },
+      { path: '/forgot-password', element: withSuspense(ForgotPassword) },
       {
         path: '/account',
         element: (
           <ProtectedRoute>
-            <Account />
+            {withSuspense(Account)}
           </ProtectedRoute>
         ),
       },
@@ -54,32 +72,32 @@ const router = createBrowserRouter([
         path: '/account/:tab',
         element: (
           <ProtectedRoute>
-            <Account />
+            {withSuspense(Account)}
           </ProtectedRoute>
         ),
       },
-      { path: '/account/wishlist', element: <Wishlist /> },
-      { path: '/about', element: <About /> },
-      { path: '/contact', element: <Contact /> },
-      { path: '/support', element: <Support /> },
-      { path: '/faq', element: <Faq /> },
-      { path: '/policies/:slug', element: <Policy /> },
-      { path: '*', element: <NotFound /> },
+      { path: '/account/wishlist', element: withSuspense(Wishlist) },
+      { path: '/about', element: withSuspense(About) },
+      { path: '/contact', element: withSuspense(Contact) },
+      { path: '/support', element: withSuspense(Support) },
+      { path: '/faq', element: withSuspense(Faq) },
+      { path: '/policies/:slug', element: withSuspense(Policy) },
+      { path: '*', element: withSuspense(NotFound) },
     ],
   },
   {
     path: '/admin',
     element: <AdminLayout />,
     children: [
-      { path: '', element: <Dashboard /> },
-      { path: 'login', element: <AdminLogin /> },
-      { path: 'products', element: <AdminProducts /> },
-      { path: 'orders', element: <AdminOrders /> },
-      { path: 'users', element: <AdminUsers /> },
-      { path: 'coupons', element: <AdminCoupons /> },
-      { path: 'reviews', element: <AdminReviews /> },
-      { path: 'analytics', element: <AdminAnalytics /> },
-      { path: 'settings', element: <AdminSettings /> },
+      { path: '', element: withSuspense(Dashboard) },
+      { path: 'login', element: withSuspense(AdminLogin) },
+      { path: 'products', element: withSuspense(AdminProducts) },
+      { path: 'orders', element: withSuspense(AdminOrders) },
+      { path: 'users', element: withSuspense(AdminUsers) },
+      { path: 'coupons', element: withSuspense(AdminCoupons) },
+      { path: 'reviews', element: withSuspense(AdminReviews) },
+      { path: 'analytics', element: withSuspense(AdminAnalytics) },
+      { path: 'settings', element: withSuspense(AdminSettings) },
     ],
   },
 ])

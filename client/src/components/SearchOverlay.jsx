@@ -76,7 +76,7 @@ export default function SearchOverlay() {
                   <button onClick={() => go(p.slug)} className="group flex w-full items-center gap-4 px-5 py-3 text-left transition-colors hover:bg-pitch2">
                     <span className="h-12 w-12 shrink-0 border border-line bg-night flex items-center justify-center overflow-hidden">
                       {p.images?.[0] ? (
-                        <img src={p.images[0].url} alt={p.name} className="w-full h-full object-cover" />
+                        <img src={p.images[0].url} alt={p.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                       ) : (
                         <span className="text-xs text-muted font-head">IMG</span>
                       )}

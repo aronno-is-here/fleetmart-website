@@ -242,7 +242,7 @@ function FlashDeal() {
           </div>
           <div className="mx-auto w-full max-w-xs">
             {deal.images?.[0] ? (
-              <img src={deal.images[0].url} alt={deal.name} className="w-full object-contain" />
+              <img src={deal.images[0].url} alt={deal.name} className="w-full object-contain" loading="lazy" decoding="async" />
             ) : (
               <div className="aspect-square bg-pitch2 flex items-center justify-center">
                 <span className="font-display text-4xl text-chalk/10">IMG</span>

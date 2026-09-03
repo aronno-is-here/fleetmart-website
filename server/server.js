@@ -84,7 +84,7 @@ app.use(cookieParser())
 app.use(mongoSanitize())
 
 // Static files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), { maxAge: '7d' }))
 
 // Logging
 if (process.env.NODE_ENV === 'development') app.use(morgan('dev'))
@@ -125,7 +125,7 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
 // Serve React build in production (non-Vercel only)
 if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
   const clientDist = path.join(__dirname, '..', 'client', 'dist')
-  app.use(express.static(clientDist))
+  app.use(express.static(clientDist, { maxAge: '1y', immutable: true }))
   app.get('*', (_req, res) => {
     res.sendFile(path.join(clientDist, 'index.html'))
   })
