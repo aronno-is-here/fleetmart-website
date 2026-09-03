@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Phone, Mail, MapPin, MessageCircle, Send } from 'lucide-react'
 import { useDispatch } from 'react-redux'
 import { toast } from '../features/uiSlice'
+import SEO from '../components/SEO'
 
 export default function Contact() {
   const dispatch = useDispatch()
@@ -16,6 +17,11 @@ export default function Contact() {
 
   return (
     <div className="container-fm py-10">
+      <SEO
+        title="Contact Us"
+        description="Get in touch with Fleetmart. Order support, bulk orders, returns & refunds. Call 09612-FLEET or visit our store in Dhanmondi, Dhaka."
+        url="/contact"
+      />
       <p className="eyebrow mb-2">We answer fast</p>
       <h1 className="font-display text-5xl uppercase tracking-wide text-chalk">Contact Us</h1>
 

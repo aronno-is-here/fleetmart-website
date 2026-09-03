@@ -8,6 +8,7 @@ import { ProductArt } from '../components/ProductArt'
 import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
 import Rating from '../components/ui/Rating'
 import SectionHeading from '../components/ui/SectionHeading'
+import SEO from '../components/SEO'
 import { fmt, discounted, discountPct } from '../lib/format'
 import { addToCart } from '../features/cartSlice'
 import { toggleWishlist, inWishlist } from '../features/wishlistSlice'
@@ -184,6 +185,24 @@ export default function ProductDetails() {
 
   return (
     <div className="pb-20">
+      <SEO
+        title={product.name}
+        description={product.description || `${product.name} - ${product.brand} football gear. ${fmt(product.discountPrice || product.price)}`}
+        image={product.images?.[0]?.url}
+        url={`/product/${product.slug}`}
+        type="product"
+        product={{
+          name: product.name,
+          description: product.description,
+          brand: product.brand,
+          price: product.price,
+          discountPrice: product.discountPrice,
+          images: product.images,
+          rating: product.rating,
+          numReviews: product.numReviews,
+          totalStock: Object.values(product.stock || {}).reduce((a, b) => a + b, 0),
+        }}
+      />
       <div className="border-b border-line bg-pitch/40">
         <div className="container-fm flex items-center gap-2 py-3 text-xs uppercase tracking-widest text-muted">
           <Link to="/" className="hover:text-volt">Home</Link>

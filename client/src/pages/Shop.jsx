@@ -4,6 +4,7 @@ import { SlidersHorizontal, X } from 'lucide-react'
 import { CATEGORIES, BRANDS, TEAMS, SIZES, BOOT_SIZES } from '../data/products'
 import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
 import PriceRange from '../components/PriceRange'
+import SEO from '../components/SEO'
 import { fmt } from '../lib/format'
 import api from '../lib/api'
 
@@ -150,6 +151,11 @@ export default function Shop() {
 
   return (
     <div className="container-fm py-10">
+      <SEO
+        title={activeCat ? activeCat.name : 'Catalog'}
+        description={`Shop ${activeCat ? activeCat.name : 'all'} football jerseys, boots, balls & training gear. ${total} products available.`}
+        url={`/shop${cat ? `?category=${cat}` : ''}`}
+      />
       <div className="mb-8 flex items-end justify-between">
         <div>
           <p className="eyebrow mb-2">{q ? `Results for "${q}"` : 'Browse everything'}</p>

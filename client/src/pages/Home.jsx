@@ -7,6 +7,7 @@ import { CATEGORIES, TEAMS } from '../data/products'
 import { ProductArt, JerseyArt, BootArt } from '../components/ProductArt'
 import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
 import SectionHeading from '../components/ui/SectionHeading'
+import SEO from '../components/SEO'
 import { fmt } from '../lib/format'
 import api from '../lib/api'
 
@@ -394,6 +395,11 @@ function RecentlyViewed() {
 export default function Home() {
   return (
     <>
+      <SEO
+        title="Home"
+        description="Premium football jerseys, boots, balls & training gear in Bangladesh. Customize your kit with name & number printing. Shop official club & national team kits."
+        url="/"
+      />
       <Hero />
       <CategoryTiles />
       <Featured />

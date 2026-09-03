@@ -2,10 +2,16 @@ import { Link } from 'react-router-dom'
 import { Zap, Target, Users, Globe } from 'lucide-react'
 import { JerseyArt } from '../components/ProductArt'
 import { TEAMS } from '../data/products'
+import SEO from '../components/SEO'
 
 export default function About() {
   return (
     <div>
+      <SEO
+        title="About Us"
+        description="Learn about Fleetmart - Bangladesh's trusted source for premium football jerseys, boots, and gear since 2021. Official-quality kits with in-house customization."
+        url="/about"
+      />
       <section className="relative overflow-hidden border-b border-line">
         <div className="pointer-events-none absolute inset-0 opacity-[0.05]">
           <div className="absolute left-1/2 top-1/2 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-chalk" />
