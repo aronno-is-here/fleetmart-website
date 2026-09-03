@@ -19,6 +19,7 @@ export default function AdminLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const user = JSON.parse(localStorage.getItem('fm_user') || '{}')
+  const token = localStorage.getItem('fm_token')
 
   const logout = () => {
     localStorage.removeItem('fm_token')
@@ -27,6 +28,11 @@ export default function AdminLayout() {
   }
 
   if (location.pathname === '/admin/login') return <Outlet />
+
+  if (!token || user.role !== 'admin') {
+    navigate('/admin/login')
+    return null
+  }
 
   return (
     <div className="flex h-screen bg-night">
