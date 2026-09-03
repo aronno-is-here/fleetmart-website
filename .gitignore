@@ -14,6 +14,7 @@ public/
 # Admin credentials
 ADMIN_CREDENTIALS.md
 VERCEL_CREDENTIALS.txt
+PROJECT_CREDENTIALS.txt
 
 # Logs
 *.log
