@@ -17,7 +17,7 @@ const generateReviewerName = async () => {
   return name
 }
 
-// GET /api/reviews/product/:productId — public, visible reviews
+// GET /api/reviews/product/:productId — public, visible reviews (paginated)
 router.get('/product/:productId', async (req, res, next) => {
   try {
     const { page = 1, limit = 50 } = req.query
@@ -33,16 +33,6 @@ router.get('/product/:productId', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// GET /api/reviews/:productId — backward compatible
-router.get('/:productId', async (req, res, next) => {
-  try {
-    const reviews = await Review.find({ product: req.params.productId, isVisible: true })
-      .sort({ rating: -1, createdAt: -1 })
-      .limit(50)
-    res.json({ reviews })
-  } catch (err) { next(err) }
-})
-
 // GET /api/reviews/featured — public, top reviews for homepage
 router.get('/featured', async (_req, res, next) => {
   try {
@@ -50,6 +40,48 @@ router.get('/featured', async (_req, res, next) => {
       .sort({ rating: -1, createdAt: -1 })
       .limit(10)
       .populate('product', 'name slug')
+    res.json({ reviews })
+  } catch (err) { next(err) }
+})
+
+// GET /api/reviews/my — authenticated user's own reviews
+router.get('/my', protect, async (req, res, next) => {
+  try {
+    const { page = 1, limit = 50 } = req.query
+    const skip = (Number(page) - 1) * Number(limit)
+    const [reviews, total] = await Promise.all([
+      Review.find({ user: req.user._id })
+        .populate('product', 'name slug images')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit)),
+      Review.countDocuments({ user: req.user._id }),
+    ])
+    res.json({ reviews, total, page: Number(page), pages: Math.ceil(total / Number(limit)) })
+  } catch (err) { next(err) }
+})
+
+// GET /api/reviews/eligibility/:productId — check if user can review a product
+router.get('/eligibility/:productId', protect, async (req, res, next) => {
+  try {
+    const productId = req.params.productId
+    const deliveredOrders = await Order.find({
+      user: req.user._id,
+      orderStatus: 'delivered',
+      'items.product': productId,
+    })
+    const eligible = deliveredOrders.length > 0
+    const existingReview = await Review.findOne({ user: req.user._id, product: productId })
+    res.json({ eligible, hasReviewed: !!existingReview, deliveredOrders: deliveredOrders.map(o => ({ _id: o._id, orderId: o.orderId })) })
+  } catch (err) { next(err) }
+})
+
+// GET /api/reviews/:productId — backward compatible (MUST be after specific routes)
+router.get('/:productId', async (req, res, next) => {
+  try {
+    const reviews = await Review.find({ product: req.params.productId, isVisible: true })
+      .sort({ rating: -1, createdAt: -1 })
+      .limit(50)
     res.json({ reviews })
   } catch (err) { next(err) }
 })

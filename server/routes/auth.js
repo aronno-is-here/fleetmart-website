@@ -2,10 +2,10 @@ import { Router } from 'express'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { body, validationResult } from 'express-validator'
-import nodemailer from 'nodemailer'
 import { OAuth2Client } from 'google-auth-library'
 import User from '../models/User.js'
 import { protect } from '../middleware/auth.js'
+import { sendPlainText } from '../services/email.js'
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
 
@@ -33,38 +33,6 @@ const setCookies = (res, accessToken, refreshToken) => {
 }
 
 const generateCode = () => String(Math.floor(100000 + Math.random() * 900000))
-
-let transporter = null
-const getTransporter = () => {
-  if (transporter) return transporter
-  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-    transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    })
-  }
-  return transporter
-}
-
-const sendEmail = async (to, subject, body) => {
-  const t = getTransporter()
-  if (!t) {
-    console.log(`[EMAIL STUB] To: ${to} | Subject: ${subject}`)
-    return true
-  }
-  await t.sendMail({
-    from: process.env.SMTP_FROM || 'FleetMart <noreply@fleetmart.com>',
-    to,
-    subject,
-    text: body,
-  })
-  return true
-}
 
 const sendSMS = async (phone, message) => {
   console.log(`[SMS STUB] To: ${phone} | Message: ${message}`)
@@ -287,7 +255,7 @@ router.post('/forgot-password', [
     await user.save()
 
     if (method === 'email') {
-      await sendEmail(user.email, 'FleetMart Password Reset', `Your verification code is: ${code}. It expires in 10 minutes.`)
+      await sendPlainText(user.email, 'FleetMart Password Reset', `Your verification code is: ${code}. It expires in 10 minutes.`)
       res.json({ message: `Verification code sent to ${user.email}` })
     } else {
       if (!user.phone) {

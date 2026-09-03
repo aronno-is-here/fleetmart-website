@@ -5,6 +5,7 @@ import Order from '../models/Order.js'
 import PaymentAttempt from '../models/PaymentAttempt.js'
 import Product from '../models/Product.js'
 import { protect, adminOnly } from '../middleware/auth.js'
+import { sendEmail, buildOrderReceiptEmail } from '../services/email.js'
 
 const router = Router()
 
@@ -217,6 +218,13 @@ router.post('/success', async (req, res, next) => {
     attempt.orderId = orderId
     await attempt.save()
 
+    const receiptHtml = buildOrderReceiptEmail(order)
+    const recipientEmail = order.user?.email || order.guestEmail
+    if (recipientEmail) {
+      sendEmail(recipientEmail, `FleetMart Order Confirmation — #${orderId}`, receiptHtml)
+        .catch((err) => console.error(`[EMAIL] Receipt failed | Order: ${orderId} | Error: ${err.message}`))
+    }
+
     res.redirect(`https://fleetmartbd.vercel.app/order/success?orderId=${orderId}`)
   } catch (err) { next(err) }
 })
@@ -343,6 +351,13 @@ router.post('/cod', async (req, res, next) => {
           { $inc: { [`stock.${item.size}`]: -item.qty } }
         ).catch(() => {})
       }
+    }
+
+    const receiptHtml = buildOrderReceiptEmail(order)
+    const recipientEmail = order.user?.email || order.guestEmail
+    if (recipientEmail) {
+      sendEmail(recipientEmail, `FleetMart Order Confirmation — #${order.orderId}`, receiptHtml)
+        .catch((err) => console.error(`[EMAIL] Receipt failed | Order: ${order.orderId} | Error: ${err.message}`))
     }
 
     res.status(201).json({ order, orderId: order.orderId })

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { motion } from 'framer-motion'
-import { ChevronRight, Minus, Plus, ShoppingBag, Heart, Truck, RefreshCcw, BadgeCheck, Ruler, Printer } from 'lucide-react'
+import { ChevronRight, Minus, Plus, ShoppingBag, Heart, Truck, RefreshCcw, BadgeCheck, Ruler, Printer, Star, Send } from 'lucide-react'
 import { TEAMS } from '../data/products'
 import { ProductArt } from '../components/ProductArt'
 import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
@@ -43,6 +43,14 @@ export default function ProductDetails() {
   const [qty, setQty] = useState(1)
   const [custom, setCustom] = useState({ name: '', number: '' })
 
+  const [reviewEligibility, setReviewEligibility] = useState(null)
+  const [showReviewForm, setShowReviewForm] = useState(false)
+  const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '', orderId: '' })
+  const [submittingReview, setSubmittingReview] = useState(false)
+  const [reviewSubmitted, setReviewSubmitted] = useState(false)
+
+  const auth = useSelector((s) => s.auth)
+
   useEffect(() => {
     setLoading(true)
     setProduct(null)
@@ -72,7 +80,13 @@ export default function ProductDetails() {
     api.get(`/reviews/${product._id}`)
       .then(({ data }) => setReviews(data.reviews || []))
       .catch(() => {})
-  }, [product])
+
+    if (auth?.token) {
+      api.get(`/reviews/eligibility/${product._id}`)
+        .then(({ data }) => setReviewEligibility(data))
+        .catch(() => setReviewEligibility({ eligible: false, hasReviewed: false }))
+    }
+  }, [product, auth?.token])
 
   if (loading) {
     return (
@@ -139,6 +153,32 @@ export default function ProductDetails() {
       window.location.href = '/checkout'
     } else {
       dispatch(setCartOpen(true))
+    }
+  }
+
+  const submitReview = async () => {
+    if (!reviewForm.rating || reviewForm.rating < 1 || reviewForm.rating > 5) {
+      dispatch(toast({ type: 'error', message: 'Please select a rating' }))
+      return
+    }
+    setSubmittingReview(true)
+    try {
+      await api.post('/reviews', {
+        product: product._id,
+        rating: reviewForm.rating,
+        comment: reviewForm.comment,
+        orderId: reviewForm.orderId || undefined,
+      })
+      dispatch(toast({ type: 'success', message: 'Review submitted!' }))
+      setReviewSubmitted(true)
+      setShowReviewForm(false)
+      const { data } = await api.get(`/reviews/${product._id}`)
+      setReviews(data.reviews || [])
+      setReviewEligibility(prev => ({ ...prev, hasReviewed: true }))
+    } catch (err) {
+      dispatch(toast({ type: 'error', message: err.response?.data?.message || 'Failed to submit review' }))
+    } finally {
+      setSubmittingReview(false)
     }
   }
 
@@ -346,28 +386,121 @@ export default function ProductDetails() {
               <div className="mt-2 flex justify-center"><Rating value={product.rating} showValue={false} /></div>
               <p className="mt-1 text-xs text-muted">{product.numReviews} verified reviews</p>
             </div>
-          </div>
-          <ul className="space-y-4">
-            {reviews.length === 0 ? (
-              <li className="border border-dashed border-line bg-pitch p-8 text-center text-sm text-muted">No reviews yet — be the first to review this product.</li>
-            ) : (
-              reviews.map((r) => (
-                <li key={r._id} className="border border-line bg-pitch p-5">
-                  <div className="flex items-center justify-between">
-                    <p className="flex items-center gap-3">
-                      <span className="grid h-9 w-9 place-items-center bg-volt/15 font-display text-volt">{r.reviewerName?.[5] || '?'}</span>
-                      <span>
-                        <span className="block font-head text-sm font-semibold uppercase tracking-wide text-chalk">{r.reviewerName || 'Anonymous'}</span>
-                        <span className="text-xs text-muted">{new Date(r.createdAt).toLocaleDateString()}</span>
-                      </span>
-                    </p>
-                    <Rating value={r.rating} size={13} showValue={false} />
-                  </div>
-                  <p className="mt-3 text-sm leading-relaxed text-muted">{r.comment}</p>
-                </li>
-              ))
+
+            {reviewEligibility?.eligible && !reviewEligibility?.hasReviewed && !reviewSubmitted && (
+              <button
+                onClick={() => setShowReviewForm(!showReviewForm)}
+                className="btn-volt w-full mt-4 !text-xs"
+              >
+                <Star size={14} /> Write a Review
+              </button>
             )}
-          </ul>
+            {reviewEligibility?.hasReviewed && (
+              <div className="mt-4 border border-volt/30 bg-volt/5 p-4 text-center">
+                <p className="text-xs text-volt font-head uppercase tracking-widest">You've reviewed this product</p>
+              </div>
+            )}
+            {reviewSubmitted && (
+              <div className="mt-4 border border-green-500/30 bg-green-500/5 p-4 text-center">
+                <p className="text-xs text-green-400 font-head uppercase tracking-widest">Review submitted!</p>
+              </div>
+            )}
+            {!reviewEligibility?.eligible && reviewEligibility !== null && !reviewEligibility?.hasReviewed && (
+              <div className="mt-4 border border-line bg-pitch p-4 text-center">
+                <p className="text-xs text-muted">Purchase and receive this product to leave a review.</p>
+              </div>
+            )}
+          </div>
+
+          <div>
+            {showReviewForm && (
+              <div className="mb-6 border border-volt/30 bg-volt/5 p-6">
+                <p className="font-head text-sm font-semibold uppercase tracking-widest text-chalk mb-4">Write Your Review</p>
+                <div className="mb-4">
+                  <label className="mb-2 block text-xs uppercase tracking-widest text-muted">Rating</label>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        onClick={() => setReviewForm({ ...reviewForm, rating: star })}
+                        className="text-2xl transition-colors"
+                      >
+                        <Star
+                          size={28}
+                          className={star <= reviewForm.rating ? 'fill-gold text-gold' : 'text-line'}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {reviewEligibility?.deliveredOrders?.length > 1 && (
+                  <div className="mb-4">
+                    <label className="mb-1 block text-xs uppercase tracking-widest text-muted">Which order?</label>
+                    <select
+                      value={reviewForm.orderId}
+                      onChange={(e) => setReviewForm({ ...reviewForm, orderId: e.target.value })}
+                      className="input-fm"
+                    >
+                      <option value="">Select an order (optional)</option>
+                      {reviewEligibility.deliveredOrders.map((o) => (
+                        <option key={o._id} value={o._id}>#{o.orderId}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div className="mb-4">
+                  <label className="mb-1 block text-xs uppercase tracking-widest text-muted">Your Review</label>
+                  <textarea
+                    rows={4}
+                    value={reviewForm.comment}
+                    onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                    placeholder="Tell others what you think about this product..."
+                    className="input-fm"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={submitReview}
+                    disabled={submittingReview || reviewForm.rating < 1}
+                    className="btn-volt !text-xs"
+                  >
+                    <Send size={14} /> {submittingReview ? 'Submitting…' : 'Submit Review'}
+                  </button>
+                  <button
+                    onClick={() => setShowReviewForm(false)}
+                    className="btn-ghost !text-xs"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <ul className="space-y-4">
+              {reviews.length === 0 ? (
+                <li className="border border-dashed border-line bg-pitch p-8 text-center text-sm text-muted">No reviews yet — be the first to review this product.</li>
+              ) : (
+                reviews.map((r) => (
+                  <li key={r._id} className="border border-line bg-pitch p-5">
+                    <div className="flex items-center justify-between">
+                      <p className="flex items-center gap-3">
+                        <span className="grid h-9 w-9 place-items-center bg-volt/15 font-display text-volt">{r.reviewerName?.[5] || '?'}</span>
+                        <span>
+                          <span className="block font-head text-sm font-semibold uppercase tracking-wide text-chalk">{r.reviewerName || 'Anonymous'}</span>
+                          <span className="text-xs text-muted">{new Date(r.createdAt).toLocaleDateString()}</span>
+                        </span>
+                      </p>
+                      <Rating value={r.rating} size={13} showValue={false} />
+                    </div>
+                    <p className="mt-3 text-sm leading-relaxed text-muted">{r.comment}</p>
+                    {r.verifiedPurchase && (
+                      <p className="mt-2 flex items-center gap-1 text-xs text-azure"><BadgeCheck size={12} /> Verified Purchase</p>
+                    )}
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>
         </div>
       </section>
 

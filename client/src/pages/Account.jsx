@@ -1,7 +1,7 @@
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { useState, useEffect, useRef } from 'react'
-import { User, Package, MapPin, Heart, LogOut, Check, Truck, Home, CreditCard, Plus, Trash2, Save, Camera } from 'lucide-react'
+import { User, Package, MapPin, Heart, LogOut, Check, Truck, Home, CreditCard, Plus, Trash2, Save, Camera, Star, MessageSquare, BadgeCheck } from 'lucide-react'
 import { fmt } from '../lib/format'
 import { toast } from '../features/uiSlice'
 import { setCredentials, logout as authLogout, updateUser } from '../features/authSlice'
@@ -10,6 +10,7 @@ import api from '../lib/api'
 const TABS = [
   { id: 'profile', label: 'Profile', icon: <User size={16} /> },
   { id: 'orders', label: 'Orders', icon: <Package size={16} /> },
+  { id: 'reviews', label: 'My Reviews', icon: <MessageSquare size={16} /> },
   { id: 'addresses', label: 'Addresses', icon: <MapPin size={16} /> },
   { id: 'billing', label: 'Billing', icon: <CreditCard size={16} /> },
   { id: 'wishlist', label: 'Wishlist', icon: <Heart size={16} /> },
@@ -29,6 +30,8 @@ export default function Account() {
   const [loading, setLoading] = useState(true)
   const [orders, setOrders] = useState([])
   const [ordersLoading, setOrdersLoading] = useState(false)
+  const [myReviews, setMyReviews] = useState([])
+  const [reviewsLoading, setReviewsLoading] = useState(false)
 
   const fetchUser = async () => {
     if (!token) {
@@ -58,6 +61,18 @@ export default function Account() {
     }
   }
 
+  const fetchMyReviews = async () => {
+    setReviewsLoading(true)
+    try {
+      const { data } = await api.get('/reviews/my')
+      setMyReviews(data.reviews || [])
+    } catch {
+      setMyReviews([])
+    } finally {
+      setReviewsLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (token) {
       fetchUser()
@@ -68,6 +83,7 @@ export default function Account() {
 
   useEffect(() => {
     if (tab === 'orders' && token) fetchOrders()
+    if (tab === 'reviews' && token) fetchMyReviews()
   }, [tab, token])
 
   const handleLogout = async () => {
@@ -127,6 +143,9 @@ export default function Account() {
           )}
           {activeTab === 'orders' && location.pathname !== '/account/wishlist' && (
             <OrdersTab orders={orders} loading={ordersLoading} />
+          )}
+          {activeTab === 'reviews' && location.pathname !== '/account/wishlist' && (
+            <MyReviewsTab reviews={myReviews} loading={reviewsLoading} />
           )}
           {activeTab === 'addresses' && (
             <AddressesTab user={user} setUser={setUser} dispatch={dispatch} />
@@ -338,6 +357,64 @@ function OrdersTab({ orders, loading }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function MyReviewsTab({ reviews, loading }) {
+  if (loading) {
+    return <div className="py-12 text-center text-muted">Loading reviews…</div>
+  }
+
+  if (reviews.length === 0) {
+    return (
+      <div className="border border-line bg-pitch p-12 text-center">
+        <p className="font-display text-4xl uppercase tracking-wide text-muted">No reviews yet</p>
+        <p className="mt-2 text-sm text-muted">After your orders are delivered, you can review the products you purchased.</p>
+        <Link to="/shop" className="btn-volt mt-5 !text-xs">Browse Products</Link>
+      </div>
+    )
+  }
+
+  const stars = (n) => '★'.repeat(n) + '☆'.repeat(5 - n)
+
+  return (
+    <div className="space-y-4">
+      <p className="font-head text-sm font-semibold uppercase tracking-widest text-chalk">My Reviews ({reviews.length})</p>
+      {reviews.map((r) => (
+        <div key={r._id} className="border border-line bg-pitch p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              {r.product?.images?.[0]?.url ? (
+                <img src={r.product.images[0].url} alt={r.product?.name} className="h-14 w-14 object-cover border border-line" />
+              ) : (
+                <div className="h-14 w-14 bg-pitch2 border border-line grid place-items-center text-muted text-xs">No img</div>
+              )}
+              <div>
+                <Link to={`/product/${r.product?.slug}`} className="font-head text-sm font-semibold uppercase tracking-wide text-chalk hover:text-volt transition-colors">
+                  {r.product?.name || 'Product'}
+                </Link>
+                <p className="mt-0.5 text-xs text-muted">{new Date(r.createdAt).toLocaleDateString()}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-gold text-sm">{stars(r.rating)}</span>
+              <span className={`text-[10px] font-head uppercase px-2 py-0.5 ${r.isVisible ? 'bg-green-500/20 text-green-400' : 'bg-ember/20 text-ember'}`}>
+                {r.isVisible ? 'Published' : 'Hidden'}
+              </span>
+            </div>
+          </div>
+          {r.comment && (
+            <p className="mt-3 text-sm leading-relaxed text-muted border-t border-line pt-3">{r.comment}</p>
+          )}
+          <div className="mt-3 flex items-center gap-3 text-xs text-muted">
+            <span className="font-head uppercase tracking-widest">{r.reviewerName}</span>
+            {r.verifiedPurchase && (
+              <span className="flex items-center gap-1 text-azure"><BadgeCheck size={12} /> Verified Purchase</span>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
