@@ -4,6 +4,7 @@ node_modules/
 # Builds
 dist/
 build/
+public/
 
 # Env (keep .env.example tracked)
 .env

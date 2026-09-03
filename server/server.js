@@ -113,6 +113,13 @@ process.on('uncaughtException', (err) => {
 })
 
 // Start
-connectDB().then(() => {
-  app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
-})
+const start = async () => {
+  await connectDB()
+  if (!process.env.VERCEL) {
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
+  }
+}
+
+start()
+
+export default app
