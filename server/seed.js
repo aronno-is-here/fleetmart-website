@@ -71,7 +71,7 @@ async function seed() {
     const admin = await User.create({
       name: 'Admin',
       email: 'admin@fleetmart.com',
-      password: 'admin123',
+      password: 'Fleet@Admin2026',
       role: 'admin',
       phone: '+8801700000000',
     })
@@ -100,7 +100,7 @@ async function seed() {
     console.log(`${COUPONS.length} coupons created`)
 
     console.log('\nSeed complete!')
-    console.log('Admin: admin@fleetmart.com / admin123')
+    console.log('Admin: admin@fleetmart.com / Fleet@Admin2026')
     console.log('Customer: demo@fleetmart.com / demo123')
     process.exit(0)
   } catch (err) {
