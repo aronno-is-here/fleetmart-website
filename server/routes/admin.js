@@ -81,11 +81,14 @@ router.get('/users', async (req, res, next) => {
 // PUT /api/admin/users/:id
 router.put('/users/:id', async (req, res, next) => {
   try {
+    if (req.params.id === req.user._id.toString()) {
+      return res.status(400).json({ message: 'Cannot modify your own account' })
+    }
     const { role, isActive } = req.body
     const update = {}
     if (role) update.role = role
     if (isActive !== undefined) update.isActive = isActive
-    const user = await User.findByIdAndUpdate(req.params.id, update, { new: true }).select('-password')
+    const user = await User.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true }).select('-password')
     if (!user) return res.status(404).json({ message: 'User not found' })
     res.json({ user })
   } catch (err) { next(err) }
@@ -94,9 +97,16 @@ router.put('/users/:id', async (req, res, next) => {
 // DELETE /api/admin/users/:id
 router.delete('/users/:id', async (req, res, next) => {
   try {
+    if (req.params.id === req.user._id.toString()) {
+      return res.status(400).json({ message: 'Cannot delete your own account' })
+    }
     const user = await User.findById(req.params.id)
     if (!user) return res.status(404).json({ message: 'User not found' })
-    if (user.role === 'admin') return res.status(400).json({ message: 'Cannot delete admin user' })
+    if (user.role === 'admin') {
+      const adminCount = await User.countDocuments({ role: 'admin' })
+      if (adminCount <= 1) return res.status(400).json({ message: 'Cannot delete the last admin' })
+      return res.status(400).json({ message: 'Cannot delete admin user' })
+    }
     await User.findByIdAndDelete(req.params.id)
     res.json({ message: 'User deleted' })
   } catch (err) { next(err) }

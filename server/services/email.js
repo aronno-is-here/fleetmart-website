@@ -1,5 +1,12 @@
 import nodemailer from 'nodemailer'
 
+const escapeHtml = (str) => String(str || '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#039;')
+
 let transporter = null
 
 const getTransporter = () => {
@@ -73,7 +80,7 @@ export const buildOrderReceiptEmail = (order) => {
   const itemsHtml = order.items.map(item => `
     <tr>
       <td style="padding:10px 12px;border-bottom:1px solid #222;color:#ccc;font-size:14px;">
-        ${item.name}${item.size ? ` (${item.size})` : ''}${item.customization?.name ? ` — ${item.customization.name} #${item.customization.number}` : ''}
+        ${escapeHtml(item.name)}${item.size ? ` (${escapeHtml(item.size)})` : ''}${item.customization?.name ? ` — ${escapeHtml(item.customization.name)} #${escapeHtml(item.customization.number)}` : ''}
       </td>
       <td style="padding:10px 12px;border-bottom:1px solid #222;color:#999;font-size:14px;text-align:center;">${item.qty}</td>
       <td style="padding:10px 12px;border-bottom:1px solid #222;color:#ccc;font-size:14px;text-align:right;">${fmt(item.price * item.qty)}</td>
@@ -100,7 +107,7 @@ export const buildOrderReceiptEmail = (order) => {
     <div style="background:#111;border:1px solid #222;padding:32px;text-align:center;margin-bottom:24px;">
       <div style="font-size:40px;margin-bottom:8px;">✅</div>
       <h1 style="margin:0;color:#fff;font-size:24px;text-transform:uppercase;letter-spacing:2px;">Order Confirmed</h1>
-      <p style="margin:8px 0 0;color:#999;font-size:14px;">Thank you, ${customerName}! Your order has been placed successfully.</p>
+      <p style="margin:8px 0 0;color:#999;font-size:14px;">Thank you, ${escapeHtml(customerName)}! Your order has been placed successfully.</p>
     </div>
 
     <div style="background:#111;border:1px solid #222;padding:24px;margin-bottom:24px;">
@@ -178,11 +185,11 @@ export const buildOrderReceiptEmail = (order) => {
     <div style="background:#111;border:1px solid #222;padding:24px;margin-bottom:24px;">
       <h2 style="margin:0 0 12px;color:#fff;font-size:14px;text-transform:uppercase;letter-spacing:2px;">Delivery Address</h2>
       <p style="margin:0;color:#ccc;font-size:14px;line-height:1.6;">
-        ${order.shippingAddress.name ? `<strong>${order.shippingAddress.name}</strong><br>` : ''}
-        ${order.shippingAddress.street ? `${order.shippingAddress.street}<br>` : ''}
-        ${order.shippingAddress.city ? `${order.shippingAddress.city}` : ''}${order.shippingAddress.zip ? ` ${order.shippingAddress.zip}` : ''}
-        ${order.shippingAddress.country ? `, ${order.shippingAddress.country}` : ''}
-        ${order.shippingAddress.phone ? `<br>Phone: ${order.shippingAddress.phone}` : ''}
+        ${order.shippingAddress.name ? `<strong>${escapeHtml(order.shippingAddress.name)}</strong><br>` : ''}
+        ${order.shippingAddress.street ? `${escapeHtml(order.shippingAddress.street)}<br>` : ''}
+        ${order.shippingAddress.city ? `${escapeHtml(order.shippingAddress.city)}` : ''}${order.shippingAddress.zip ? ` ${escapeHtml(order.shippingAddress.zip)}` : ''}
+        ${order.shippingAddress.country ? `, ${escapeHtml(order.shippingAddress.country)}` : ''}
+        ${order.shippingAddress.phone ? `<br>Phone: ${escapeHtml(order.shippingAddress.phone)}` : ''}
       </p>
     </div>
     ` : ''}

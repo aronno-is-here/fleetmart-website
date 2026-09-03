@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import Product from '../models/Product.js'
 import { protect, adminOnly } from '../middleware/auth.js'
+import { escapeRegex } from '../utils/sanitize.js'
 
 const router = Router()
 
@@ -21,10 +22,11 @@ router.get('/', async (req, res, next) => {
       if (maxPrice) filter.price.$lte = Number(maxPrice)
     }
     if (search) {
+      const safe = escapeRegex(search)
       filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { brand: { $regex: search, $options: 'i' } },
+        { name: { $regex: safe, $options: 'i' } },
+        { description: { $regex: safe, $options: 'i' } },
+        { brand: { $regex: safe, $options: 'i' } },
       ]
     }
 
@@ -58,7 +60,8 @@ router.get('/:slug', async (req, res, next) => {
 // POST /api/products — admin
 router.post('/', protect, adminOnly, async (req, res, next) => {
   try {
-    const product = await Product.create(req.body)
+    const { name, slug, description, category, subCategory, brand, team, league, price, discountPrice, stock, images, featured, isNew, customizable, artColors, isActive } = req.body
+    const product = await Product.create({ name, slug, description, category, subCategory, brand, team, league, price, discountPrice, stock, images, featured, isNew, customizable, artColors, isActive })
     res.status(201).json({ product })
   } catch (err) { next(err) }
 })
@@ -66,7 +69,8 @@ router.post('/', protect, adminOnly, async (req, res, next) => {
 // PUT /api/products/:id — admin
 router.put('/:id', protect, adminOnly, async (req, res, next) => {
   try {
-    const product = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true })
+    const { name, slug, description, category, subCategory, brand, team, league, price, discountPrice, stock, images, featured, isNew, customizable, artColors, isActive } = req.body
+    const product = await Product.findByIdAndUpdate(req.params.id, { name, slug, description, category, subCategory, brand, team, league, price, discountPrice, stock, images, featured, isNew, customizable, artColors, isActive }, { new: true, runValidators: true })
     if (!product) return res.status(404).json({ message: 'Product not found' })
     res.json({ product })
   } catch (err) { next(err) }

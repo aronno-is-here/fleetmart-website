@@ -3,6 +3,7 @@ import Order from '../models/Order.js'
 import Product from '../models/Product.js'
 import { protect, adminOnly } from '../middleware/auth.js'
 import { sendEmail } from '../services/email.js'
+import { escapeRegex } from '../utils/sanitize.js'
 
 const router = Router()
 
@@ -43,10 +44,11 @@ router.get('/', protect, adminOnly, async (req, res, next) => {
     const filter = {}
     if (status) filter.orderStatus = status
     if (search) {
+      const safe = escapeRegex(search)
       filter.$or = [
-        { orderId: { $regex: search, $options: 'i' } },
-        { guestEmail: { $regex: search, $options: 'i' } },
-        { guestName: { $regex: search, $options: 'i' } },
+        { orderId: { $regex: safe, $options: 'i' } },
+        { guestEmail: { $regex: safe, $options: 'i' } },
+        { guestName: { $regex: safe, $options: 'i' } },
       ]
     }
 

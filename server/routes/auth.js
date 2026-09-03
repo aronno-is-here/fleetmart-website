@@ -32,7 +32,7 @@ const setCookies = (res, accessToken, refreshToken) => {
   })
 }
 
-const generateCode = () => String(Math.floor(100000 + Math.random() * 900000))
+const generateCode = () => String(crypto.randomInt(100000, 999999))
 
 const sendSMS = async (phone, message) => {
   console.log(`[SMS STUB] To: ${phone} | Message: ${message}`)
@@ -52,7 +52,7 @@ const validate = (req, res) => {
 router.post('/register', [
   body('name').trim().notEmpty().withMessage('Name is required'),
   body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('password').isLength({ min: 8 }).matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/).withMessage('Password must be at least 8 characters with uppercase, lowercase, and number'),
 ], async (req, res, next) => {
   try {
     if (!validate(req, res)) return
@@ -82,7 +82,7 @@ router.post('/login', [
 
     const user = await User.findOne({ email }).select('+password')
     if (!user) {
-      return res.status(401).json({ message: 'No account found with this email. Please register first.' })
+      return res.status(401).json({ message: 'Invalid credentials' })
     }
     if (user.role === 'admin') {
       return res.status(403).json({ message: 'Admin accounts cannot login here. Use the Admin Panel.' })
@@ -177,16 +177,7 @@ router.post('/apple', [
       })
       payload = jwt.decode(appleResponse.id_token)
     } catch {
-      try {
-        const parts = identityToken.split('.')
-        if (parts.length === 3) {
-          payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString())
-        } else {
-          return res.status(401).json({ message: 'Invalid Apple token format' })
-        }
-      } catch {
-        return res.status(401).json({ message: 'Invalid Apple token' })
-      }
+      return res.status(401).json({ message: 'Failed to verify Apple token. Please try again.' })
     }
 
     const { sub: appleId, email } = payload
@@ -235,7 +226,7 @@ router.post('/forgot-password', [
 
     const user = await User.findOne({ email })
     if (!user) {
-      return res.status(404).json({ message: 'No account found with this email' })
+      return res.status(404).json({ message: 'Invalid credentials' })
     }
 
     if (user.forgotPasswordAttempts >= 5) {
@@ -279,7 +270,7 @@ router.post('/verify-code', [
 
     const user = await User.findOne({ email })
     if (!user) {
-      return res.status(404).json({ message: 'No account found with this email' })
+      return res.status(404).json({ message: 'Invalid credentials' })
     }
 
     if (!user.verificationCode || !user.verificationExpiry) {
@@ -308,7 +299,7 @@ router.post('/verify-code', [
 // POST /api/auth/reset-password
 router.post('/reset-password', [
   body('resetToken').notEmpty().withMessage('Reset token is required'),
-  body('newPassword').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('newPassword').isLength({ min: 8 }).matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/).withMessage('Password must be at least 8 characters with uppercase, lowercase, and number'),
 ], async (req, res, next) => {
   try {
     if (!validate(req, res)) return
@@ -389,7 +380,7 @@ router.put('/profile', protect, [
 // PUT /api/auth/password
 router.put('/password', protect, [
   body('currentPassword').notEmpty().withMessage('Current password is required'),
-  body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
+  body('newPassword').isLength({ min: 8 }).matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/).withMessage('New password must be at least 8 characters with uppercase, lowercase, and number'),
 ], async (req, res, next) => {
   try {
     if (!validate(req, res)) return

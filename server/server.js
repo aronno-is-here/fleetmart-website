@@ -25,6 +25,15 @@ import analyticsRoutes from './routes/analytics.js'
 import uploadRoutes from './routes/upload.js'
 import paymentRoutes from './routes/payment.js'
 
+// Validate required env vars
+const requiredEnv = ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'MONGODB_URI']
+for (const key of requiredEnv) {
+  if (!process.env[key]) {
+    console.error(`Missing required env var: ${key}`)
+    if (!process.env.VERCEL) process.exit(1)
+  }
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 const PORT = process.env.PORT || 5000
