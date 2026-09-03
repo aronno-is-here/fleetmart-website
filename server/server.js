@@ -115,17 +115,25 @@ process.on('uncaughtException', (err) => {
 })
 
 // Start
-const start = async () => {
-  try {
+if (process.env.VERCEL) {
+  let dbConnected = false
+  app.use(async (_req, _res, next) => {
+    if (!dbConnected) {
+      try {
+        await connectDB()
+        dbConnected = true
+      } catch (err) {
+        console.error('Database connection failed:', err.message)
+      }
+    }
+    next()
+  })
+} else {
+  const start = async () => {
     await connectDB()
-  } catch (err) {
-    console.error('Database connection failed:', err.message)
-  }
-  if (!process.env.VERCEL) {
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
   }
+  start()
 }
-
-start()
 
 export default app
