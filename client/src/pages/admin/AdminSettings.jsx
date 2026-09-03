@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { User, Lock, Save } from 'lucide-react'
+import { User, Lock, Save, Eye, EyeOff } from 'lucide-react'
 import api from '../../lib/api'
 
 export default function AdminSettings() {
   const [tab, setTab] = useState('profile')
   const [profile, setProfile] = useState({ name: '', email: '', phone: '' })
   const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [showPass, setShowPass] = useState({ current: false, new: false, confirm: false })
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState({ type: '', text: '' })
 
@@ -51,6 +52,27 @@ export default function AdminSettings() {
     }
     setLoading(false)
   }
+
+  const togglePass = (field) => setShowPass(prev => ({ ...prev, [field]: !prev[field] }))
+
+  const PassInput = ({ label, field, value, onChange }) => (
+    <div>
+      <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1.5">{label}</label>
+      <div className="relative">
+        <input
+          type={showPass[field] ? 'text' : 'password'}
+          value={value}
+          onChange={onChange}
+          required
+          className="input-fm pr-10"
+        />
+        <button type="button" onClick={() => togglePass(field)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-chalk transition-colors" tabIndex={-1}>
+          {showPass[field] ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      </div>
+    </div>
+  )
 
   return (
     <div className="space-y-6">
@@ -99,18 +121,9 @@ export default function AdminSettings() {
       {/* Password Tab */}
       {tab === 'password' && (
         <form onSubmit={changePassword} className="bg-pitch border border-line p-6 space-y-4 max-w-lg">
-          <div>
-            <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1.5">Current Password</label>
-            <input type="password" value={passwords.currentPassword} onChange={e => setPasswords({ ...passwords, currentPassword: e.target.value })} required className="input-fm" />
-          </div>
-          <div>
-            <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1.5">New Password</label>
-            <input type="password" value={passwords.newPassword} onChange={e => setPasswords({ ...passwords, newPassword: e.target.value })} required className="input-fm" />
-          </div>
-          <div>
-            <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1.5">Confirm New Password</label>
-            <input type="password" value={passwords.confirmPassword} onChange={e => setPasswords({ ...passwords, confirmPassword: e.target.value })} required className="input-fm" />
-          </div>
+          <PassInput label="Current Password" field="current" value={passwords.currentPassword} onChange={e => setPasswords({ ...passwords, currentPassword: e.target.value })} />
+          <PassInput label="New Password" field="new" value={passwords.newPassword} onChange={e => setPasswords({ ...passwords, newPassword: e.target.value })} />
+          <PassInput label="Confirm New Password" field="confirm" value={passwords.confirmPassword} onChange={e => setPasswords({ ...passwords, confirmPassword: e.target.value })} />
           <button type="submit" disabled={loading} className="btn-volt flex items-center gap-2">
             <Lock size={16} /> {loading ? 'Changing...' : 'Change Password'}
           </button>

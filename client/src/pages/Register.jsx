@@ -3,13 +3,14 @@ import { Link } from 'react-router-dom'
 import { AuthShell, AuthInput, PasswordInput, useAuthSubmit } from './Login'
 
 export default function Register() {
-  const { form, setForm, submit, busy } = useAuthSubmit({ mode: 'register' })
+  const { form, setForm, submit, busy, error, setError } = useAuthSubmit({ mode: 'register' })
   const [confirm, setConfirm] = useState('')
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    setError('')
     if (form.password !== confirm) {
-      alert('Passwords do not match')
+      setError('Passwords do not match')
       return
     }
     submit(e)
@@ -21,7 +22,10 @@ export default function Register() {
         <AuthInput required placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <AuthInput type="email" required placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         <PasswordInput placeholder="Password (min 6 chars)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} minLength={6} />
-        <PasswordInput placeholder="Confirm password" value={confirm} onChange={(e) => setConfirm(e.target.value)} minLength={6} />
+        <div>
+          <PasswordInput placeholder="Confirm password" value={confirm} onChange={(e) => setConfirm(e.target.value)} minLength={6} />
+          {error && <p className="mt-1.5 text-xs text-ember">{error}</p>}
+        </div>
         <label className="flex items-start gap-2 text-xs text-muted">
           <input type="checkbox" required className="mt-0.5 accent-[#C6F53F]" />
           I agree to the Terms of Service and Privacy Policy

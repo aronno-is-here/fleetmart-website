@@ -165,10 +165,12 @@ export function useAuthSubmit({ mode }) {
   const navigate = useNavigate()
   const [form, setForm] = useState({ name: '', email: '', password: '' })
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
 
   const submit = async (e) => {
     e.preventDefault()
     setBusy(true)
+    setError('')
     try {
       const endpoint = mode === 'login' ? '/auth/login' : '/auth/register'
       const payload = mode === 'login'
@@ -180,30 +182,37 @@ export function useAuthSubmit({ mode }) {
       localStorage.setItem('fm_user', JSON.stringify(data.user))
       dispatch(toast({
         type: 'success',
-        message: mode === 'login' ? 'Welcome back to the squad!' : 'Account created — you are match ready!'
+        message: mode === 'login' ? 'Login successful — Welcome back!' : 'Account created — you are match ready!'
       }))
       const redirectTo = mode === 'login' ? '/account' : '/account'
       navigate(redirectTo)
     } catch (err) {
       const msg = err.response?.data?.message || 'Something went wrong. Try again.'
-      dispatch(toast({ type: 'error', message: msg }))
+      if (mode === 'login') {
+        setError(msg)
+      } else {
+        dispatch(toast({ type: 'error', message: msg }))
+      }
     } finally {
       setBusy(false)
     }
   }
 
-  return { form, setForm, submit, busy }
+  return { form, setForm, submit, busy, error, setError }
 }
 
 export default function Login() {
-  const { form, setForm, submit, busy } = useAuthSubmit({ mode: 'login' })
+  const { form, setForm, submit, busy, error } = useAuthSubmit({ mode: 'login' })
   return (
     <AuthShell title="Welcome Back" sub="Log in to your Fleetmart squad account.">
       <SocialButtons />
       <Divider />
       <form onSubmit={submit} className="space-y-4">
         <AuthInput type="email" required placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-        <PasswordInput placeholder="Password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+        <div>
+          <PasswordInput placeholder="Password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          {error && <p className="mt-1.5 text-xs text-ember">{error}</p>}
+        </div>
         <div className="flex justify-between text-xs">
           <label className="flex items-center gap-2 text-muted"><input type="checkbox" className="accent-[#C6F53F]" /> Remember me</label>
           <Link to="/forgot-password" className="text-volt hover:underline">Forgot password?</Link>
