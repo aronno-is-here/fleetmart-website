@@ -110,8 +110,11 @@ router.post('/login', [
     const { email, password } = req.body
 
     const user = await User.findOne({ email }).select('+password')
-    if (!user || !(await user.comparePassword(password))) {
-      return res.status(401).json({ message: 'Invalid email or password' })
+    if (!user) {
+      return res.status(401).json({ message: 'No account found with this email. Please register first.' })
+    }
+    if (!(await user.comparePassword(password))) {
+      return res.status(401).json({ message: 'Wrong password. Please try again.' })
     }
 
     const token = generateToken(user._id)
