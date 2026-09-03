@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { SlidersHorizontal, X } from 'lucide-react'
 import { CATEGORIES, BRANDS, TEAMS, SIZES, BOOT_SIZES } from '../data/products'
 import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
+import PriceRange from '../components/PriceRange'
 import { fmt } from '../lib/format'
 import api from '../lib/api'
 
@@ -14,6 +15,9 @@ const SORTS = [
   { id: 'rating', label: 'Top Rated' },
   { id: 'popular', label: 'Popular' },
 ]
+
+const PRICE_ABS_MIN = 0
+const PRICE_ABS_MAX = 15000
 
 function FilterGroup({ title, children, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen)
@@ -50,7 +54,8 @@ export default function Shop() {
   const team = params.get('team') || ''
   const size = params.get('size') || ''
   const customizable = params.get('customizable') === '1'
-  const maxPrice = Number(params.get('maxPrice')) || 13000
+  const minPrice = Number(params.get('minPrice')) || PRICE_ABS_MIN
+  const maxPrice = Number(params.get('maxPrice')) || PRICE_ABS_MAX
   const sort = params.get('sort') || 'featured'
   const q = params.get('q') || ''
 
@@ -61,7 +66,8 @@ export default function Shop() {
     if (brand) apiParams.brand = brand
     if (team) apiParams.team = team
     if (size) apiParams.size = size
-    if (maxPrice < 13000) apiParams.maxPrice = maxPrice
+    if (minPrice > PRICE_ABS_MIN) apiParams.minPrice = minPrice
+    if (maxPrice < PRICE_ABS_MAX) apiParams.maxPrice = maxPrice
     if (sort) apiParams.sort = sort
     if (q) apiParams.search = q
 
@@ -74,7 +80,7 @@ export default function Shop() {
       })
       .catch(() => { setProducts([]); setTotal(0) })
       .finally(() => setLoading(false))
-  }, [cat, brand, team, size, customizable, maxPrice, sort, q])
+  }, [cat, brand, team, size, customizable, minPrice, maxPrice, sort, q])
 
   const setParam = (key, val) => {
     const next = new URLSearchParams(params)
@@ -83,11 +89,21 @@ export default function Shop() {
     setParams(next, { replace: true })
   }
 
+  const setPriceRange = (min, max) => {
+    const next = new URLSearchParams(params)
+    if (min > PRICE_ABS_MIN) next.set('minPrice', String(min))
+    else next.delete('minPrice')
+    if (max < PRICE_ABS_MAX) next.set('maxPrice', String(max))
+    else next.delete('maxPrice')
+    setParams(next, { replace: true })
+  }
+
   const activeCat = CATEGORIES.find((c) => c.id === cat)
   const sizeOptions = cat === 'boots' ? BOOT_SIZES : [...new Set([...SIZES, ...BOOT_SIZES])]
 
   const clearAll = () => setParams(new URLSearchParams(), { replace: true })
-  const activeCount = [cat, brand, team, size, customizable ? '1' : '', q].filter(Boolean).length + (maxPrice < 13000 ? 1 : 0)
+  const priceActive = minPrice > PRICE_ABS_MIN || maxPrice < PRICE_ABS_MAX
+  const activeCount = [cat, brand, team, size, customizable ? '1' : '', q].filter(Boolean).length + (priceActive ? 1 : 0)
 
   const filterPanel = (
     <div>
@@ -123,17 +139,8 @@ export default function Shop() {
           ))}
         </div>
       </FilterGroup>
-      <FilterGroup title="Max Price">
-        <input
-          type="range"
-          min={500}
-          max={13000}
-          step={500}
-          value={maxPrice}
-          onChange={(e) => setParam('maxPrice', e.target.value)}
-          className="w-full accent-[#C6F53F]"
-        />
-        <p className="text-sm text-volt">Up to {fmt(maxPrice)}</p>
+      <FilterGroup title="Price Range">
+        <PriceRange min={minPrice} max={maxPrice} onChange={setPriceRange} />
       </FilterGroup>
       <FilterGroup title="Options">
         <CheckRow checked={customizable} onChange={() => setParam('customizable', customizable ? '' : '1')} label="Customizable (name & number)" />
