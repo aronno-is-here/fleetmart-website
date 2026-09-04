@@ -47,10 +47,21 @@ async function cascadePathUpdate(categoryId, newPath, newLevel) {
   }
 }
 
+async function collectDescendantIds(categoryId) {
+  const children = await Category.find({ parent: categoryId }).select('_id')
+  let ids = children.map(c => c._id)
+  for (const child of children) {
+    const deeper = await collectDescendantIds(child._id)
+    ids = ids.concat(deeper)
+  }
+  return ids
+}
+
 async function cascadeProductCategoryPath(categoryId) {
-  const descendant = await Category.find({ parent: categoryId }).select('_id id')
-  const ids = [categoryId, ...descendant.map(c => c._id)]
-  const products = await Product.find({ categoryPath: { $in: ids } })
+  const descendantIds = await collectDescendantIds(categoryId)
+  const allIds = [categoryId, ...descendantIds]
+  if (allIds.length === 0) return
+  const products = await Product.find({ categoryPath: { $in: allIds } })
   for (const p of products) {
     const newPath = []
     let current = await Category.findOne({ id: p.category })
