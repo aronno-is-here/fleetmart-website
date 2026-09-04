@@ -130,7 +130,7 @@ router.post('/initiate', optionalAuth, async (req, res, next) => {
         full_name: customerName,
         email: customerEmail,
         amount: String(amountToPay),
-        metadata: JSON.stringify({ attemptId }),
+        metadata: { attemptId },
         redirect_url: `${SITE_URL}/api/payment/success`,
         return_type: 'POST',
         cancel_url: `${SITE_URL}/api/payment/cancel`,
@@ -259,10 +259,16 @@ router.post('/success', async (req, res, next) => {
     // ── Atomic stock deduction ──
     for (const item of attempt.items) {
       if (item.product && item.size) {
-        await Product.updateOne(
+        const result = await Product.updateOne(
           { _id: item.product, [`stock.${item.size}`]: { $gte: item.qty } },
           { $inc: { [`stock.${item.size}`]: -item.qty } }
-        ).catch(() => {})
+        ).catch((err) => {
+          console.error(`[STOCK] Deduction failed | Product: ${item.product} | Size: ${item.size} | Error: ${err.message}`)
+          return { modifiedCount: 0 }
+        })
+        if (result.modifiedCount === 0) {
+          console.warn(`[STOCK] Insufficient stock or not found | Product: ${item.product} | Size: ${item.size} | Qty: ${item.qty}`)
+        }
       }
     }
 
@@ -300,13 +306,20 @@ router.post('/cancel', async (req, res) => {
 // POST /api/payment/ipn — Instant Payment Notification (webhook from UddoktaPay)
 router.post('/ipn', async (req, res) => {
   try {
-    const { invoice_id } = req.body
+    if (!isUddoktaPayConfigured()) {
+      return res.status(400).json({ message: 'Payment gateway not configured' })
+    }
 
-    if (!invoice_id || !isUddoktaPayConfigured()) {
+    const apiKey = req.headers['rt-uddoktapay-api-key']
+    if (!apiKey || apiKey !== UDDOKTAPAY_API_KEY) {
+      return res.status(403).json({ message: 'Invalid API key' })
+    }
+
+    const { invoice_id } = req.body
+    if (!invoice_id) {
       return res.status(400).json({ message: 'Invalid request' })
     }
 
-    // Verify with UddoktaPay
     const verification = await uddoktapayRequest('/api/verify-payment', { invoice_id })
 
     if (verification.status === 'COMPLETED') {
@@ -318,8 +331,6 @@ router.post('/ipn', async (req, res) => {
         if (attempt?.orderId) {
           return res.json({ message: 'Already processed' })
         }
-        // IPN received but primary processing happens in /success
-        return res.json({ message: 'IPN received' })
       }
     }
 
