@@ -11,6 +11,9 @@ const categorySchema = new mongoose.Schema({
   level: { type: Number, default: 0 },
   displayOrder: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true },
+  isHero: { type: Boolean, default: false },
+  isKitBuilder: { type: Boolean, default: false },
+  isTurfInstallation: { type: Boolean, default: false },
 }, { timestamps: true })
 
 categorySchema.index({ parent: 1 })

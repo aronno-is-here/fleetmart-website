@@ -29,7 +29,7 @@ function Hero() {
 
   const hasBanners = banners.length > 0
   const slideCount = hasBanners ? banners.length : 1
-  const firstCat = CATEGORIES.length > 0 ? CATEGORIES[0] : null
+  const heroCat = CATEGORIES.find(c => c.isHero) || null
   const firstTeam = teams.length > 0 ? teams[0] : null
 
   useEffect(() => {
@@ -64,8 +64,8 @@ function Hero() {
             Official club & national jerseys with custom name and number printing. Printed in hours, not days.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            {firstCat && (
-              <Link to={`/shop?category=${firstCat.id}`} className="btn-volt">
+            {heroCat && (
+              <Link to={`/shop?category=${heroCat.id}`} className="btn-volt">
                 Shop Jerseys <ArrowRight size={16} />
               </Link>
             )}

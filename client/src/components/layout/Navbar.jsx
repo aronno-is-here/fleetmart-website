@@ -37,7 +37,6 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [megaOpen, setMegaOpen] = useState(false)
   const [catCounts, setCatCounts] = useState({})
-  const [customizableCat, setCustomizableCat] = useState(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [expandedMobile, setExpandedMobile] = useState({})
   const location = useLocation()
@@ -68,13 +67,10 @@ export default function Navbar() {
     api.get('/products', { params: { limit: 200 } }).then(({ data }) => {
       const counts = {}
       allCategories.forEach(c => { counts[c.id] = 0 })
-      let foundCustomizable = null
       data.products.forEach(p => {
         if (counts[p.category] !== undefined) counts[p.category]++
-        if (!foundCustomizable && p.customizable) foundCustomizable = p.category
       })
       setCatCounts(counts)
-      if (foundCustomizable) setCustomizableCat(foundCustomizable)
     }).catch(() => {})
   }, [megaOpen, allCategories])
 
@@ -185,7 +181,10 @@ export default function Navbar() {
                 <p className="font-display text-2xl uppercase tracking-wide text-volt">Kit Builder</p>
                 <p className="text-xs uppercase tracking-widest text-muted">Print your name & number on any jersey — live preview</p>
               </div>
-              <Link to={customizableCat ? `/shop?category=${customizableCat}&customizable=1` : '/shop?customizable=1'} className="btn-volt !py-2 !text-xs">Customize Now</Link>
+              <Link to={(() => {
+                const kitCat = allCategories.find(c => c.isKitBuilder)
+                return kitCat ? `/shop?category=${kitCat.id}&customizable=1` : '/shop?customizable=1'
+              })()} className="btn-volt !py-2 !text-xs">Customize Now</Link>
             </div>
           </div>
         </div>

@@ -110,7 +110,7 @@ export default function Footer() {
               <Link to="/about" className="text-sm text-muted transition-colors hover:text-volt">About Us</Link>
             </li>
             {(() => {
-              const turfCat = CATEGORIES.find(c => c.name.toLowerCase().includes('turf'))
+              const turfCat = CATEGORIES.find(c => c.isTurfInstallation)
               return turfCat ? (
                 <li>
                   <Link to={`/shop?category=${turfCat.id}`} className="text-sm text-muted transition-colors hover:text-volt">Turf Installation</Link>

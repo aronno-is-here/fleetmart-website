@@ -93,6 +93,9 @@ function buildTree(categories, parentId = null) {
       level: c.level,
       displayOrder: c.displayOrder,
       isActive: c.isActive,
+      isHero: c.isHero,
+      isKitBuilder: c.isKitBuilder,
+      isTurfInstallation: c.isTurfInstallation,
       children: buildTree(categories, c._id),
     }))
 }
@@ -143,7 +146,7 @@ router.get('/children/:parentId', async (req, res, next) => {
 // POST /api/categories — admin, create category (auto-generate slug from name)
 router.post('/', protect, adminOnly, async (req, res, next) => {
   try {
-    const { name, blurb, autoBlurb, image, parent, displayOrder } = req.body
+    const { name, blurb, autoBlurb, image, parent, displayOrder, isHero, isKitBuilder, isTurfInstallation } = req.body
 
     if (!name) {
       return res.status(400).json({ message: 'Name is required' })
@@ -176,6 +179,9 @@ router.post('/', protect, adminOnly, async (req, res, next) => {
       parent: parent || null,
       path, level,
       displayOrder: displayOrder || 0,
+      isHero: isHero || false,
+      isKitBuilder: isKitBuilder || false,
+      isTurfInstallation: isTurfInstallation || false,
     })
 
     if (useAutoBlurb && !blurb) {
@@ -193,7 +199,7 @@ router.put('/:id', protect, adminOnly, async (req, res, next) => {
     const category = await Category.findById(req.params.id)
     if (!category) return res.status(404).json({ message: 'Category not found' })
 
-    const { name, blurb, autoBlurb, image, displayOrder, isActive, parent } = req.body
+    const { name, blurb, autoBlurb, image, displayOrder, isActive, parent, isHero, isKitBuilder, isTurfInstallation } = req.body
 
     if (name !== undefined) {
       category.name = name
@@ -206,6 +212,9 @@ router.put('/:id', protect, adminOnly, async (req, res, next) => {
     if (image !== undefined) category.image = image
     if (displayOrder !== undefined) category.displayOrder = displayOrder
     if (isActive !== undefined) category.isActive = isActive
+    if (isHero !== undefined) category.isHero = isHero
+    if (isKitBuilder !== undefined) category.isKitBuilder = isKitBuilder
+    if (isTurfInstallation !== undefined) category.isTurfInstallation = isTurfInstallation
 
     if (parent !== undefined) {
       if (parent === null) {

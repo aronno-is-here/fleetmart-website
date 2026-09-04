@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Plus, Pencil, Trash2, X, ChevronRight, ChevronDown, GripVertical, Eye, EyeOff } from 'lucide-react'
 import api from '../../lib/api'
 
-const EMPTY = { name: '', blurb: '', autoBlurb: true, image: '', parent: null, displayOrder: 0 }
+const EMPTY = { name: '', blurb: '', autoBlurb: true, image: '', parent: null, displayOrder: 0, isHero: false, isKitBuilder: false, isTurfInstallation: false }
 
 function CategoryNode({ cat, depth = 0, onEdit, onDelete, onToggleActive, onAddChild, expanded, onToggle }) {
   const hasChildren = cat.children && cat.children.length > 0
@@ -20,6 +20,9 @@ function CategoryNode({ cat, depth = 0, onEdit, onDelete, onToggleActive, onAddC
           <span className="font-head text-sm text-chalk">{cat.name}</span>
           <span className="ml-2 text-xs text-muted font-mono">({cat.id})</span>
           {cat.blurb && <span className="ml-2 text-xs text-muted">— {cat.blurb}</span>}
+          {cat.isHero && <span className="ml-2 text-[10px] font-head uppercase tracking-widest text-volt bg-volt/10 px-1.5 py-0.5">hero</span>}
+          {cat.isKitBuilder && <span className="ml-2 text-[10px] font-head uppercase tracking-widest text-blue-400 bg-blue-400/10 px-1.5 py-0.5">kit builder</span>}
+          {cat.isTurfInstallation && <span className="ml-2 text-[10px] font-head uppercase tracking-widest text-green-400 bg-green-400/10 px-1.5 py-0.5">turf</span>}
           {!cat.isActive && <span className="ml-2 text-[10px] font-head uppercase tracking-widest text-ember bg-ember/10 px-1.5 py-0.5">inactive</span>}
         </div>
         <span className="text-xs text-muted">{cat.children?.length || 0} sub</span>
@@ -88,6 +91,9 @@ export default function AdminCategories() {
       image: cat.image || '',
       parent: cat.parent || null,
       displayOrder: cat.displayOrder || 0,
+      isHero: cat.isHero || false,
+      isKitBuilder: cat.isKitBuilder || false,
+      isTurfInstallation: cat.isTurfInstallation || false,
     })
   }
 
@@ -213,6 +219,21 @@ export default function AdminCategories() {
               <div>
                 <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1">Display Order</label>
                 <input type="number" value={form.displayOrder} onChange={e => setForm({ ...form, displayOrder: Number(e.target.value) })} className="input-fm" />
+              </div>
+              <div className="border-t border-line pt-4 space-y-3">
+                <p className="text-xs font-head text-muted uppercase tracking-widest">Editorial Assignments</p>
+                <label className="flex items-center gap-2 text-sm text-chalk">
+                  <input type="checkbox" checked={form.isHero} onChange={e => setForm({ ...form, isHero: e.target.checked })} className="accent-volt" />
+                  Hero destination (Home page "Shop Jerseys" button)
+                </label>
+                <label className="flex items-center gap-2 text-sm text-chalk">
+                  <input type="checkbox" checked={form.isKitBuilder} onChange={e => setForm({ ...form, isKitBuilder: e.target.checked })} className="accent-volt" />
+                  Kit Builder (Navbar "Customize Now" link)
+                </label>
+                <label className="flex items-center gap-2 text-sm text-chalk">
+                  <input type="checkbox" checked={form.isTurfInstallation} onChange={e => setForm({ ...form, isTurfInstallation: e.target.checked })} className="accent-volt" />
+                  Turf Installation (Footer link)
+                </label>
               </div>
               <div className="flex gap-3 pt-4 border-t border-line">
                 <button type="submit" disabled={saving} className="btn-volt">
