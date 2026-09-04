@@ -85,6 +85,7 @@ function OrderPreview({ order, onClose }) {
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between"><span className="text-muted">Subtotal</span><span className="text-chalk">{fmt(order.subtotal)}</span></div>
                 {order.shippingFee > 0 && <div className="flex justify-between"><span className="text-muted">Shipping</span><span className="text-chalk">{fmt(order.shippingFee)}</span></div>}
+                {order.shippingFee > 0 && <p className="text-[10px] text-volt">Delivery charge — paid separately to delivery man</p>}
                 {order.discount > 0 && <div className="flex justify-between"><span className="text-muted">Discount</span><span className="text-volt">-{fmt(order.discount)}</span></div>}
                 <div className="flex justify-between border-t border-line pt-1"><span className="text-chalk font-semibold">Total</span><span className="text-volt font-head font-semibold">{fmt(order.total)}</span></div>
                 <div className="flex justify-between"><span className="text-muted">Paid</span><span className="text-green-400 font-semibold">{fmt(order.amountPaid)}</span></div>

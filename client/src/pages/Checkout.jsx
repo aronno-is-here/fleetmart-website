@@ -59,7 +59,9 @@ export default function Checkout() {
   }, [token, user])
 
   const shipFee = ship === 'express' ? 150 : shipping
-  const finalTotal = grand - shipping + shipFee
+  // Online payable total excludes delivery — delivery is paid separately to delivery man
+  const onlineTotal = total - discount
+  const finalTotal = onlineTotal
   const amountToPay = paymentType === 'partial' ? PARTIAL_PAYMENT_AMOUNT : finalTotal
 
   const canNext = () => {
@@ -124,6 +126,7 @@ export default function Checkout() {
             <div className="mt-4 border border-line bg-pitch p-4 text-sm">
               <p className="text-chalk">Amount paid: <span className="text-volt">{fmt(PARTIAL_PAYMENT_AMOUNT)}</span></p>
               <p className="text-muted">Remaining: {fmt(finalTotal - PARTIAL_PAYMENT_AMOUNT)} (to be paid on delivery)</p>
+              <p className="text-xs text-muted mt-1">Delivery charge (৳80–130) is paid separately to the delivery man.</p>
             </div>
           )}
           <div className="mt-8 flex justify-center gap-3">
@@ -291,7 +294,6 @@ export default function Checkout() {
           <dl className="mt-5 space-y-3 border-t border-line pt-5 text-sm">
             <div className="flex justify-between"><dt className="text-muted">Items ({items.reduce((a, i) => a + i.qty, 0)})</dt><dd className="text-chalk">{fmt(total)}</dd></div>
             {discount > 0 && <div className="flex justify-between"><dt className="text-muted">Coupon</dt><dd className="text-volt">-{fmt(discount)}</dd></div>}
-            <div className="flex justify-between"><dt className="text-muted">Delivery</dt><dd className="text-chalk">{shipFee === 0 ? <span className="text-volt">FREE</span> : fmt(shipFee)}</dd></div>
             <div className="flex justify-between border-t border-line pt-3">
               <dt className="font-head font-semibold uppercase tracking-widest text-chalk">Total</dt>
               <dd className="font-head text-xl font-semibold text-volt">{fmt(finalTotal)}</dd>
@@ -303,7 +305,12 @@ export default function Checkout() {
               </div>
             )}
           </dl>
-          <div className="mt-5 border border-line bg-night p-3 text-xs leading-relaxed text-muted">
+          <div className="mt-4 border border-line bg-night p-3 text-xs leading-relaxed text-muted">
+            <p className="mb-2 font-head text-[11px] uppercase tracking-widest text-muted">Shipping Charges</p>
+            <p>Inside Dhaka: ৳80 · Outside Dhaka: ৳130</p>
+            <p className="mt-1 text-volt">Delivery charge is paid separately to the delivery man.</p>
+          </div>
+          <div className="mt-3 border border-line bg-night p-3 text-xs leading-relaxed text-muted">
             100% secure payment · 7-day returns · Authenticity guaranteed
           </div>
         </aside>

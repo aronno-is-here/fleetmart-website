@@ -210,7 +210,8 @@ router.post('/', protect, async (req, res, next) => {
         await Coupon.updateOne({ _id: coupon._id }, { $inc: { usedCount: 1 } })
       }
     }
-    const grand = Math.max(0, subtotal + shippingFee - discount)
+    // Online payable total excludes delivery — delivery is paid separately to delivery man
+    const grand = Math.max(0, subtotal - discount)
 
     const crypto = await import('crypto')
     const orderId = `FM-${Date.now().toString(36).toUpperCase()}-${crypto.default.randomBytes(3).toString('hex').toUpperCase()}`

@@ -65,7 +65,8 @@ const recalculateAmounts = async (items, couponCode) => {
       await Coupon.updateOne({ _id: coupon._id }, { $inc: { usedCount: 1 } })
     }
   }
-  const grand = Math.max(0, subtotal + shippingFee - discount)
+  // Online payable total excludes delivery — delivery is paid separately to delivery man
+  const grand = Math.max(0, subtotal - discount)
   return { validatedItems, subtotal, shippingFee, discount, grand }
 }
 

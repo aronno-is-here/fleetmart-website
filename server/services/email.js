@@ -163,6 +163,9 @@ export const buildOrderReceiptEmail = (order) => {
         <tr>
           <td style="padding:4px 12px;color:#999;font-size:14px;">Shipping</td>
           <td style="padding:4px 12px;color:#ccc;font-size:14px;text-align:right;">${fmt(order.shippingFee)}</td>
+        </tr>
+        <tr>
+          <td colspan="2" style="padding:2px 12px;color:#ccff00;font-size:11px;">Delivery charge is paid separately to the delivery man.</td>
         </tr>` : ''}
         ${order.discount > 0 ? `
         <tr>

@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react'
 
 const FAQS = [
   ['How long does delivery take?', 'Dhaka city: 24–48 hours. Outside Dhaka: 2–4 working days via our courier partners. You get SMS tracking at every step.'],
-  ['How does jersey customization work?', 'Pick any customizable jersey, enter your name and number on the product page, and watch the live preview. Pro-grade vinyl printing adds ৳150 and ships within 24 hours.'],
+  ['How does jersey customization work?', 'Pick any customizable jersey, enter your name and number on the product page, and watch the live preview. Pro-grade vinyl printing adds ৳250 and ships within 24 hours.'],
   ['Can I return a customized jersey?', 'Customized items are returnable only for printing defects or wrong size due to our error. Standard (non-customized) items have a full 7-day return window.'],
   ['What payment methods do you accept?', 'bKash and Nagad via UddoktaPay. Pay in full or choose partial payment (৳300 upfront).'],
   ['Are the jerseys authentic?', 'Every kit passes our 3-point authenticity check — official fabric weight, heat-pressed crest verification, and colour-lock testing. Guaranteed on every invoice.'],
