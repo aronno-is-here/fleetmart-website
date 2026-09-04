@@ -61,7 +61,7 @@ export default function SearchOverlay() {
             onKeyDown={(e) => {
               if (e.key === 'Enter' && results[0]) go(results[0].slug)
             }}
-            placeholder="Search jerseys, boots, clubs…"
+            placeholder="Search products, teams, brands…"
             className="w-full bg-transparent text-lg text-chalk outline-none placeholder:text-muted"
           />
           <button onClick={() => dispatch(setSearchOpen(false))} aria-label="Close search" className="text-muted hover:text-chalk">
@@ -94,15 +94,7 @@ export default function SearchOverlay() {
             </ul>
           ) : (
             <div className="px-5 py-6">
-              <p className="eyebrow mb-3">{q ? 'No matches — try these' : 'Popular searches'}</p>
-              <div className="flex flex-wrap gap-2">
-                {['Jersey', 'Volt Armada', 'Boots', 'Bangladesh', 'Retro', 'Turf'].map((t) => (
-                  <button key={t} onClick={() => setQ(t)} className="border border-line px-3 py-1.5 text-xs uppercase tracking-widest text-muted transition-colors hover:border-volt hover:text-volt">
-                    {t}
-                  </button>
-                ))}
-              </div>
-              <p className="eyebrow mb-3 mt-6">Browse</p>
+              <p className="eyebrow mb-3">{q ? 'No matches — try these' : 'Browse categories'}</p>
               <div className="flex flex-wrap gap-2">
                 {CATEGORIES.map((c) => (
                   <button

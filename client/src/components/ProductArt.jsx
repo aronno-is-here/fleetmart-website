@@ -313,7 +313,8 @@ export function ProductArt({ product, view = 'front', custom = {} }) {
     ? { primary: undefined, ...custom }
     : { primary: product.artColors?.primary, secondary: product.artColors?.secondary, accent: product.artColors?.accent, ...custom }
 
-  if (product.category === 'jersey') {
+  const isJersey = ['player_jersey', 'fan_jersey', 'retro_jersey'].includes(product.sizeChartType)
+  if (isJersey) {
     const t = product.team ? { primary: custom.primary, secondary: custom.secondary, number: custom.number, name: custom.name } : {}
     return <JerseyArt {...colors} {...t} view={view} />
   }

@@ -3,8 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { motion } from 'framer-motion'
 import { ArrowRight, ChevronLeft, ChevronRight, Timer, Quote } from 'lucide-react'
-import { TEAMS } from '../data/products'
 import { useFlatCategories } from '../hooks/useCategories'
+import { useTeams } from '../hooks/useTeams'
 import { ProductArt, JerseyArt, BootArt } from '../components/ProductArt'
 import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
 import SectionHeading from '../components/ui/SectionHeading'
@@ -17,6 +17,8 @@ function Hero() {
   const [paused, setPaused] = useState(false)
   const [banners, setBanners] = useState([])
   const timer = useRef(null)
+  const { categories: CATEGORIES } = useFlatCategories()
+  const { teams } = useTeams()
 
   useEffect(() => {
     api.get('/banners').then(({ data }) => {
@@ -26,6 +28,8 @@ function Hero() {
 
   const hasBanners = banners.length > 0
   const slideCount = hasBanners ? banners.length : 1
+  const jerseyCat = CATEGORIES.find(c => c.id === 'jersey')
+  const firstTeam = teams.length > 0 ? teams[0] : null
 
   useEffect(() => {
     if (paused || !hasBanners) return
@@ -59,9 +63,11 @@ function Hero() {
             Official club & national jerseys with custom name and number printing. Printed in hours, not days.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link to="/shop?category=jersey" className="btn-volt">
-              Shop Jerseys <ArrowRight size={16} />
-            </Link>
+            {jerseyCat && (
+              <Link to={`/shop?category=${jerseyCat.id}`} className="btn-volt">
+                Shop Jerseys <ArrowRight size={16} />
+              </Link>
+            )}
             <Link to="/shop" className="btn-ghost">Browse All</Link>
           </div>
         </motion.div>
@@ -92,7 +98,11 @@ function Hero() {
           >
             <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_40%,rgba(198,245,63,0.13),transparent_65%)]" />
             <div className="animate-fadeUp">
-              <JerseyArt primary={TEAMS.omega.primary} secondary={TEAMS.omega.secondary} number="10" name="FLEET" view="front" />
+              {firstTeam ? (
+                <JerseyArt primary={firstTeam.primary} secondary={firstTeam.secondary} number="10" name="FLEET" view="front" />
+              ) : (
+                <JerseyArt primary="#7C1D2E" secondary="#F5E9DC" number="10" name="FLEET" view="front" />
+              )}
             </div>
             <div className="absolute -right-2 top-6 border border-volt/40 bg-night/85 px-4 py-2 backdrop-blur sm:-right-6">
               <p className="font-head text-xs uppercase tracking-[0.2em] text-muted">From</p>

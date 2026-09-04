@@ -106,16 +106,20 @@ export default function Footer() {
         <div>
           <p className="font-head text-sm font-semibold uppercase tracking-[0.2em] text-chalk">Company</p>
           <ul className="mt-4 space-y-2.5">
-            {[
-              ['About Us', '/about'],
-              ['Turf Installation', '/shop?category=turf'],
-              ['Terms of Service', '/policies/terms'],
-              ['Privacy Policy', '/policies/privacy'],
-            ].map(([label, to]) => (
-              <li key={label}>
-                <Link to={to} className="text-sm text-muted transition-colors hover:text-volt">{label}</Link>
+            <li>
+              <Link to="/about" className="text-sm text-muted transition-colors hover:text-volt">About Us</Link>
+            </li>
+            {CATEGORIES.find(c => c.id === 'turf') && (
+              <li>
+                <Link to={`/shop?category=turf`} className="text-sm text-muted transition-colors hover:text-volt">Turf Installation</Link>
               </li>
-            ))}
+            )}
+            <li>
+              <Link to="/policies/terms" className="text-sm text-muted transition-colors hover:text-volt">Terms of Service</Link>
+            </li>
+            <li>
+              <Link to="/policies/privacy" className="text-sm text-muted transition-colors hover:text-volt">Privacy Policy</Link>
+            </li>
           </ul>
           <div className="mt-5 flex gap-3">
             {SOCIALS.map((s) => (

@@ -1,34 +1,34 @@
 import { useState, useEffect } from 'react'
 import api from '../lib/api'
 
-export function useCategories() {
-  const [categories, setCategories] = useState([])
+export function useTeams() {
+  const [teams, setTeams] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.get('/categories/tree')
+    api.get('/teams')
       .then(({ data }) => {
-        if (data.categories?.length) setCategories(data.categories)
+        if (data.teams?.length) setTeams(data.teams)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 
-  return { categories, loading }
+  return { teams, loading }
 }
 
-export function useFlatCategories() {
-  const [categories, setCategories] = useState([])
+export function useAllTeams() {
+  const [teams, setTeams] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.get('/categories')
+    api.get('/teams/all')
       .then(({ data }) => {
-        if (data.categories?.length) setCategories(data.categories)
+        if (data.teams?.length) setTeams(data.teams)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 
-  return { categories, loading }
+  return { teams, loading, setTeams }
 }

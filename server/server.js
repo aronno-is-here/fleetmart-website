@@ -25,7 +25,10 @@ import analyticsRoutes from './routes/analytics.js'
 import uploadRoutes from './routes/upload.js'
 import paymentRoutes from './routes/payment.js'
 import bannerRoutes from './routes/banners.js'
+import brandRoutes from './routes/brands.js'
+import teamRoutes from './routes/teams.js'
 import ensureDemoProduct from './startup/ensureDemoProduct.js'
+import ensureTaxonomy from './startup/ensureTaxonomy.js'
 
 // Validate required env vars
 const requiredEnv = ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'MONGODB_URI']
@@ -100,6 +103,7 @@ if (process.env.VERCEL) {
         await connectDB()
         dbConnected = true
         ensureDemoProduct()
+        ensureTaxonomy()
       } catch (err) {
         console.error('Database connection failed:', err.message)
       }
@@ -123,6 +127,8 @@ app.use('/api/admin', analyticsRoutes)
 app.use('/api/upload', uploadRoutes)
 app.use('/api/payment', paymentRoutes)
 app.use('/api/banners', bannerRoutes)
+app.use('/api/brands', brandRoutes)
+app.use('/api/teams', teamRoutes)
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
 
@@ -151,6 +157,7 @@ process.on('uncaughtException', (err) => {
 if (!process.env.VERCEL) {
   connectDB().then(() => {
     ensureDemoProduct()
+    ensureTaxonomy()
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
   })
 }

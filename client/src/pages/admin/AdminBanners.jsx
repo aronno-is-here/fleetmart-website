@@ -171,11 +171,11 @@ export default function AdminBanners() {
               </div>
               <div>
                 <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1">Title (optional)</label>
-                <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="input-fm" placeholder="e.g. Arsenal Banner" />
+                <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="input-fm" placeholder="e.g. Summer Sale Banner" />
               </div>
               <div>
                 <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1">Target URL</label>
-                <input value={form.targetUrl} onChange={e => setForm({ ...form, targetUrl: e.target.value })} required className="input-fm" placeholder="/catalog?team=arsenal" />
+                <input value={form.targetUrl} onChange={e => setForm({ ...form, targetUrl: e.target.value })} required className="input-fm" placeholder="/shop?category=jersey" />
               </div>
               <div>
                 <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1">Display Order</label>

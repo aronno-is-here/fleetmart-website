@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Tag,
   LogOut, Menu, X, Star, Settings, BarChart3, FolderTree, Image,
+  Badge, UsersRound,
 } from 'lucide-react'
 import { logout } from '../../features/authSlice'
 import api from '../../lib/api'
@@ -12,6 +13,8 @@ const NAV = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/products', label: 'Products', icon: Package },
   { to: '/admin/categories', label: 'Categories', icon: FolderTree },
+  { to: '/admin/brands', label: 'Brands', icon: Badge },
+  { to: '/admin/teams', label: 'Teams', icon: UsersRound },
   { to: '/admin/banners', label: 'Hero Banners', icon: Image },
   { to: '/admin/orders', label: 'Orders', icon: ShoppingCart },
   { to: '/admin/users', label: 'Users', icon: Users },

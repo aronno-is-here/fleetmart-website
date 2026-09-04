@@ -4,6 +4,7 @@ const categorySchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   name: { type: String, required: true },
   blurb: { type: String, default: '' },
+  autoBlurb: { type: Boolean, default: true },
   image: { type: String, default: '' },
   parent: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null },
   path: { type: String, default: '/' },

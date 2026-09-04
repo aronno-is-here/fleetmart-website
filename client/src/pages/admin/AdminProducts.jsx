@@ -61,49 +61,34 @@ function CategoryPicker({ value, categoryPath, onChange, categories }) {
     })
   }
 
-  const levels = [[]]
-  if (selected[0] && childrenMap[selected[0]]) {
-    levels.push(childrenMap[selected[0]])
+  const getChildren = (parentId) => {
+    if (!parentId) return rootCats
+    return childrenMap[parentId] || []
   }
-  if (selected[1] && childrenMap[selected[1]]) {
-    levels.push(childrenMap[selected[1]])
-  }
-  if (selected[2] && childrenMap[selected[2]]) {
-    levels.push(childrenMap[selected[2]])
+
+  const levels = []
+  for (let i = 0; i <= selected.length; i++) {
+    const parentId = i === 0 ? null : selected[i - 1]
+    const children = getChildren(parentId)
+    if (children.length === 0) break
+    levels.push({ children, selectedId: selected[i] || '' })
   }
 
   return (
     <div className="flex flex-col gap-2">
-      <select value={selected[0] || ''} onChange={e => handleChange(0, e.target.value)} className="input-fm">
-        <option value="">Root category</option>
-        {rootCats.map(c => (
-          <option key={c._id} value={c._id}>{c.name} ({c.id})</option>
-        ))}
-      </select>
-      {levels[1] && levels[1].length > 0 && (
-        <select value={selected[1] || ''} onChange={e => handleChange(1, e.target.value)} className="input-fm">
-          <option value="">Select subcategory</option>
-          {levels[1].map(c => (
+      {levels.map((level, idx) => (
+        <select
+          key={idx}
+          value={level.selectedId}
+          onChange={e => handleChange(idx, e.target.value)}
+          className="input-fm"
+        >
+          <option value="">{idx === 0 ? 'Root category' : `Level ${idx + 1} category`}</option>
+          {level.children.map(c => (
             <option key={c._id} value={c._id}>{c.name} ({c.id})</option>
           ))}
         </select>
-      )}
-      {levels[2] && levels[2].length > 0 && (
-        <select value={selected[2] || ''} onChange={e => handleChange(2, e.target.value)} className="input-fm">
-          <option value="">Select sub-subcategory</option>
-          {levels[2].map(c => (
-            <option key={c._id} value={c._id}>{c.name} ({c.id})</option>
-          ))}
-        </select>
-      )}
-      {levels[3] && levels[3].length > 0 && (
-        <select value={selected[3] || ''} onChange={e => handleChange(3, e.target.value)} className="input-fm">
-          <option value="">Select team/leaf</option>
-          {levels[3].map(c => (
-            <option key={c._id} value={c._id}>{c.name} ({c.id})</option>
-          ))}
-        </select>
-      )}
+      ))}
     </div>
   )
 }
@@ -111,6 +96,8 @@ function CategoryPicker({ value, categoryPath, onChange, categories }) {
 export default function AdminProducts() {
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
+  const [brands, setBrands] = useState([])
+  const [teams, setTeams] = useState([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [pages, setPages] = useState(1)
@@ -129,6 +116,20 @@ export default function AdminProducts() {
     } catch {}
   }
 
+  const loadBrands = async () => {
+    try {
+      const { data } = await api.get('/brands/all')
+      setBrands(data.brands)
+    } catch {}
+  }
+
+  const loadTeams = async () => {
+    try {
+      const { data } = await api.get('/teams/all')
+      setTeams(data.teams)
+    } catch {}
+  }
+
   const load = (p = 1) => {
     setLoading(true)
     const params = { page: p, limit: 20 }
@@ -143,7 +144,7 @@ export default function AdminProducts() {
   }
 
   useEffect(() => { load() }, [filter])
-  useEffect(() => { loadCategories() }, [])
+  useEffect(() => { loadCategories(); loadBrands(); loadTeams() }, [])
 
   const openNew = () => { setEditing('new'); setForm(empty) }
   const openEdit = (p) => {
@@ -334,11 +335,21 @@ export default function AdminProducts() {
                 </div>
                 <div>
                   <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1">Brand</label>
-                  <input value={form.brand} onChange={e => setForm({ ...form, brand: e.target.value })} className="input-fm" />
+                  <select value={form.brand} onChange={e => setForm({ ...form, brand: e.target.value })} className="input-fm">
+                    <option value="">No brand</option>
+                    {brands.map(b => (
+                      <option key={b._id} value={b.name}>{b.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1">Team</label>
-                  <input value={form.team} onChange={e => setForm({ ...form, team: e.target.value })} className="input-fm" />
+                  <select value={form.team || ''} onChange={e => setForm({ ...form, team: e.target.value || null })} className="input-fm">
+                    <option value="">No team</option>
+                    {teams.map(t => (
+                      <option key={t._id} value={t.slug}>{t.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1">Price (BDT)</label>

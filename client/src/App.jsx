@@ -33,6 +33,8 @@ const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics'))
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'))
 const AdminCategories = lazy(() => import('./pages/admin/AdminCategories'))
 const AdminBanners = lazy(() => import('./pages/admin/AdminBanners'))
+const AdminBrands = lazy(() => import('./pages/admin/AdminBrands'))
+const AdminTeams = lazy(() => import('./pages/admin/AdminTeams'))
 
 function Loading() {
   return (
@@ -102,6 +104,8 @@ const router = createBrowserRouter([
       { path: 'reviews', element: withSuspense(AdminReviews) },
       { path: 'analytics', element: withSuspense(AdminAnalytics) },
       { path: 'categories', element: withSuspense(AdminCategories) },
+      { path: 'brands', element: withSuspense(AdminBrands) },
+      { path: 'teams', element: withSuspense(AdminTeams) },
       { path: 'banners', element: withSuspense(AdminBanners) },
       { path: 'settings', element: withSuspense(AdminSettings) },
     ],

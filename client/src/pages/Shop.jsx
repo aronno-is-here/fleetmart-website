@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { SlidersHorizontal, X } from 'lucide-react'
-import { BRANDS, TEAMS, SIZES, BOOT_SIZES } from '../data/products'
 import { useFlatCategories } from '../hooks/useCategories'
+import { useBrands } from '../hooks/useBrands'
+import { useTeams } from '../hooks/useTeams'
 import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
 import PriceRange from '../components/PriceRange'
 import SEO from '../components/SEO'
@@ -20,6 +21,9 @@ const SORTS = [
 
 const PRICE_ABS_MIN = 0
 const PRICE_ABS_MAX = 15000
+
+const SIZES = ['S', 'M', 'L', 'XL', 'XXL']
+const BOOT_SIZES = ['39', '40', '41', '42', '43', '44', '45']
 
 function FilterGroup({ title, children, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen)
@@ -51,6 +55,8 @@ export default function Shop() {
   const [total, setTotal] = useState(0)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const { categories: CATEGORIES } = useFlatCategories()
+  const { brands } = useBrands()
+  const { teams } = useTeams()
 
   const cat = params.get('category') || ''
   const brand = params.get('brand') || ''
@@ -117,14 +123,14 @@ export default function Shop() {
         ))}
       </FilterGroup>
       <FilterGroup title="Brand">
-        {BRANDS.map((b) => (
-          <CheckRow key={b} checked={brand === b} onChange={() => setParam('brand', brand === b ? '' : b)} label={b} />
+        {brands.map((b) => (
+          <CheckRow key={b._id} checked={brand === b.name} onChange={() => setParam('brand', brand === b.name ? '' : b.name)} label={b.name} />
         ))}
       </FilterGroup>
       <FilterGroup title="Team / Nation">
         <CheckRow checked={!team} onChange={() => setParam('team', '')} label="All Teams" />
-        {Object.entries(TEAMS).map(([id, t]) => (
-          <CheckRow key={id} checked={team === id} onChange={() => setParam('team', team === id ? '' : id)} label={t.name} />
+        {teams.map((t) => (
+          <CheckRow key={t._id} checked={team === t.slug} onChange={() => setParam('team', team === t.slug ? '' : t.slug)} label={t.name} />
         ))}
       </FilterGroup>
       <FilterGroup title="Size" defaultOpen={false}>
@@ -155,7 +161,7 @@ export default function Shop() {
     <div className="container-fm py-10">
       <SEO
         title={activeCat ? activeCat.name : 'Catalog'}
-        description={`Shop ${activeCat ? activeCat.name : 'all'} football jerseys, boots, balls & training gear. ${total} products available.`}
+        description={`Shop ${activeCat ? activeCat.name : 'all'} football gear. ${total} products available.`}
         url={`/shop${cat ? `?category=${cat}` : ''}`}
       />
       <div className="mb-8 flex items-end justify-between">

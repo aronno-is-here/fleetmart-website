@@ -1,34 +1,34 @@
 import { useState, useEffect } from 'react'
 import api from '../lib/api'
 
-export function useCategories() {
-  const [categories, setCategories] = useState([])
+export function useBrands() {
+  const [brands, setBrands] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.get('/categories/tree')
+    api.get('/brands')
       .then(({ data }) => {
-        if (data.categories?.length) setCategories(data.categories)
+        if (data.brands?.length) setBrands(data.brands)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 
-  return { categories, loading }
+  return { brands, loading }
 }
 
-export function useFlatCategories() {
-  const [categories, setCategories] = useState([])
+export function useAllBrands() {
+  const [brands, setBrands] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.get('/categories')
+    api.get('/brands/all')
       .then(({ data }) => {
-        if (data.categories?.length) setCategories(data.categories)
+        if (data.brands?.length) setBrands(data.brands)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 
-  return { categories, loading }
+  return { brands, loading, setBrands }
 }

@@ -28,7 +28,8 @@ export default function ProductCard({ product, hideArt = false }) {
   const pct = discountPct(product)
   const stock = totalStock(product)
   const lowStock = stock > 0 && stock <= 12
-  const blankArt = hideArt && product.category === 'jersey'
+  const isJersey = ['player_jersey', 'fan_jersey', 'retro_jersey'].includes(product.sizeChartType)
+  const blankArt = hideArt && isJersey
 
   const defaultSize = () => {
     const order = ['M', 'L', 'S', 'XL', 'XXL']
@@ -67,7 +68,7 @@ export default function ProductCard({ product, hideArt = false }) {
           {blankArt ? <StudioArt /> : <ProductArt product={product} view="front" />}
         </div>
         <div className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-          {blankArt ? <StudioArt /> : <ProductArt product={product} view={product.category === 'jersey' ? 'back' : 'front'} />}
+          {blankArt ? <StudioArt /> : <ProductArt product={product} view={isJersey ? 'back' : 'front'} />}
         </div>
 
         <div className="absolute left-3 top-3 flex flex-col gap-1.5">

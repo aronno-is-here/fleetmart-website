@@ -181,7 +181,7 @@ export default function Navbar() {
                 <p className="font-display text-2xl uppercase tracking-wide text-volt">Kit Builder</p>
                 <p className="text-xs uppercase tracking-widest text-muted">Print your name & number on any jersey — live preview</p>
               </div>
-              <Link to="/shop?category=jersey&customizable=1" className="btn-volt !py-2 !text-xs">Customize Now</Link>
+              <Link to={allCategories.find(c => c.id === 'jersey') ? `/shop?category=${allCategories.find(c => c.id === 'jersey').id}&customizable=1` : '/shop?customizable=1'} className="btn-volt !py-2 !text-xs">Customize Now</Link>
             </div>
           </div>
         </div>

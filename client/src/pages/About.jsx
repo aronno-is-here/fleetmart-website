@@ -1,15 +1,19 @@
 import { Link } from 'react-router-dom'
 import { Zap, Target, Users, Globe } from 'lucide-react'
 import { JerseyArt } from '../components/ProductArt'
-import { TEAMS } from '../data/products'
+import { useTeams } from '../hooks/useTeams'
 import SEO from '../components/SEO'
 
 export default function About() {
+  const { teams } = useTeams()
+  const team1 = teams.length > 0 ? teams[0] : { primary: '#7C1D2E', secondary: '#F5E9DC', number: '#F5E9DC' }
+  const team2 = teams.length > 2 ? teams[2] : { primary: '#2A3320', secondary: '#C6F53F', number: '#C6F53F' }
+
   return (
     <div>
       <SEO
         title="About Us"
-        description="Learn about Fleetmart - Bangladesh's trusted source for premium football jerseys, boots, and gear since 2021. Official-quality kits with in-house customization."
+        description="Learn about Fleetmart - Bangladesh's trusted source for premium football gear since 2021. Official-quality kits with in-house customization."
         url="/about"
       />
       <section className="relative overflow-hidden border-b border-line">
@@ -23,7 +27,7 @@ export default function About() {
               BORN ON THE<br /><span className="text-volt">STREETS</span><br />OF DHAKA
             </h1>
             <p className="mt-6 max-w-lg text-base leading-relaxed text-muted">
-              Fleetmart started in 2021 with one rooftop stall and a simple frustration: finding an authentic jersey in Bangladesh meant overpaying for fakes, or waiting weeks for imports.
+              Fleetmart started in 2021 with one rooftop stall and a simple frustration: finding an authentic kit in Bangladesh meant overpaying for fakes, or waiting weeks for imports.
             </p>
             <p className="mt-4 max-w-lg text-base leading-relaxed text-muted">
               Today we stock official-quality kits from 62 clubs and nations, print your name and number in-house within hours, and outfit Sunday-league squads to national-team fan clubs. Same streets. Bigger pitch.
@@ -34,8 +38,8 @@ export default function About() {
             </div>
           </div>
           <div className="mx-auto grid max-w-md grid-cols-2 gap-4">
-            <div className="scale-105"><JerseyArt {...TEAMS.omega} number="07" name="FLEET" view="back" /></div>
-            <div className="translate-y-6"><JerseyArt {...TEAMS.voltarmada} number="10" name="GAME ON" view="front" /></div>
+            <div className="scale-105"><JerseyArt {...team1} number="07" name="FLEET" view="back" /></div>
+            <div className="translate-y-6"><JerseyArt {...team2} number="10" name="GAME ON" view="front" /></div>
           </div>
         </div>
       </section>

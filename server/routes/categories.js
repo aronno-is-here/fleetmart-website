@@ -5,7 +5,48 @@ import { protect, adminOnly } from '../middleware/auth.js'
 
 const router = Router()
 
-// ── Build tree from flat list ──
+function toSlug(name) {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/[\s]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+async function generateUniqueSlug(name, excludeId = null) {
+  let slug = toSlug(name)
+  let existing = await Category.findOne({ id: slug, ...(excludeId ? { _id: { $ne: excludeId } } : {}) })
+  let counter = 1
+  while (existing) {
+    slug = `${toSlug(name)}-${counter}`
+    existing = await Category.findOne({ id: slug, ...(excludeId ? { _id: { $ne: excludeId } } : {}) })
+    counter++
+  }
+  return slug
+}
+
+async function autoGenerateBlurb(categoryId) {
+  const children = await Category.find({ parent: categoryId, isActive: true })
+    .sort({ displayOrder: 1, name: 1 })
+    .select('name')
+  if (children.length > 0) {
+    return children.map(c => c.name).join(' · ')
+  }
+  return ''
+}
+
+async function cascadePathUpdate(categoryId, newPath, newLevel) {
+  const children = await Category.find({ parent: categoryId })
+  for (const child of children) {
+    child.path = `${newPath}${categoryId}/`
+    child.level = newLevel + 1
+    await child.save()
+    await cascadePathUpdate(child._id, child.path, child.level)
+  }
+}
+
 function buildTree(categories, parentId = null) {
   return categories
     .filter(c => {
@@ -18,6 +59,7 @@ function buildTree(categories, parentId = null) {
       id: c.id,
       name: c.name,
       blurb: c.blurb,
+      autoBlurb: c.autoBlurb,
       image: c.image,
       parent: c.parent,
       path: c.path,
@@ -71,19 +113,16 @@ router.get('/children/:parentId', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// POST /api/categories — admin, create category
+// POST /api/categories — admin, create category (auto-generate slug from name)
 router.post('/', protect, adminOnly, async (req, res, next) => {
   try {
-    const { id, name, blurb, image, parent, displayOrder } = req.body
+    const { name, blurb, autoBlurb, image, parent, displayOrder } = req.body
 
-    if (!id || !name) {
-      return res.status(400).json({ message: 'id and name are required' })
+    if (!name) {
+      return res.status(400).json({ message: 'Name is required' })
     }
 
-    const existing = await Category.findOne({ id })
-    if (existing) {
-      return res.status(400).json({ message: `Category with id "${id}" already exists` })
-    }
+    const id = await generateUniqueSlug(name)
 
     let level = 0
     let path = '/'
@@ -96,11 +135,26 @@ router.post('/', protect, adminOnly, async (req, res, next) => {
       path = `${parentCat.path}${parentCat._id}/`
     }
 
+    const useAutoBlurb = autoBlurb !== false
+    let finalBlurb = blurb || ''
+    if (useAutoBlurb && !blurb) {
+      finalBlurb = ''
+    }
+
     const category = await Category.create({
-      id, name, blurb: blurb || '', image: image || '',
-      parent: parent || null, path, level,
+      id, name,
+      blurb: finalBlurb,
+      autoBlurb: useAutoBlurb,
+      image: image || '',
+      parent: parent || null,
+      path, level,
       displayOrder: displayOrder || 0,
     })
+
+    if (useAutoBlurb && !blurb) {
+      category.blurb = await autoGenerateBlurb(category._id)
+      await category.save()
+    }
 
     res.status(201).json({ category })
   } catch (err) { next(err) }
@@ -112,10 +166,16 @@ router.put('/:id', protect, adminOnly, async (req, res, next) => {
     const category = await Category.findById(req.params.id)
     if (!category) return res.status(404).json({ message: 'Category not found' })
 
-    const { name, blurb, image, displayOrder, isActive, parent } = req.body
+    const { name, blurb, autoBlurb, image, displayOrder, isActive, parent } = req.body
 
-    if (name !== undefined) category.name = name
+    if (name !== undefined) {
+      category.name = name
+      if (!category.id || category.id === toSlug(name)) {
+        category.id = await generateUniqueSlug(name, category._id)
+      }
+    }
     if (blurb !== undefined) category.blurb = blurb
+    if (autoBlurb !== undefined) category.autoBlurb = autoBlurb
     if (image !== undefined) category.image = image
     if (displayOrder !== undefined) category.displayOrder = displayOrder
     if (isActive !== undefined) category.isActive = isActive
@@ -143,6 +203,19 @@ router.put('/:id', protect, adminOnly, async (req, res, next) => {
     }
 
     await category.save()
+
+    // Cascade path updates to all descendants
+    await cascadePathUpdate(category._id, category.path, category.level)
+
+    // Update parent's blurb if it uses autoBlurb
+    if (category.parent) {
+      const parentCat = await Category.findById(category.parent)
+      if (parentCat && parentCat.autoBlurb) {
+        parentCat.blurb = await autoGenerateBlurb(parentCat._id)
+        await parentCat.save()
+      }
+    }
+
     res.json({ category })
   } catch (err) { next(err) }
 })
@@ -164,11 +237,21 @@ router.delete('/:id', protect, adminOnly, async (req, res, next) => {
     }
 
     await Category.findByIdAndDelete(category._id)
+
+    // Update parent's blurb if it uses autoBlurb
+    if (category.parent) {
+      const parentCat = await Category.findById(category.parent)
+      if (parentCat && parentCat.autoBlurb) {
+        parentCat.blurb = await autoGenerateBlurb(parentCat._id)
+        await parentCat.save()
+      }
+    }
+
     res.json({ message: 'Category deleted' })
   } catch (err) { next(err) }
 })
 
-// PUT /api/categories/reorder — admin, bulk reorder
+// PUT /api/categories/reorder/bulk — admin, bulk reorder
 router.put('/reorder/bulk', protect, adminOnly, async (req, res, next) => {
   try {
     const { items } = req.body

@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { motion } from 'framer-motion'
 import { ChevronRight, Minus, Plus, ShoppingBag, Heart, Truck, RefreshCcw, BadgeCheck, Ruler, Printer, Star, Send } from 'lucide-react'
-import { TEAMS } from '../data/products'
+import { useTeams } from '../hooks/useTeams'
 import { ProductArt } from '../components/ProductArt'
 import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
 import Rating from '../components/ui/Rating'
@@ -54,6 +54,7 @@ export default function ProductDetails() {
   const [reviewSubmitted, setReviewSubmitted] = useState(false)
 
   const auth = useSelector((s) => s.auth)
+  const { teams } = useTeams()
 
   useEffect(() => {
     setLoading(true)
@@ -126,7 +127,7 @@ export default function ProductDetails() {
   const unitPrice = price + (isCustomizing ? CUSTOM_FEE : 0)
   const sizeStock = size != null ? product.stock[size] : null
 
-  const team = product.team ? TEAMS[product.team] : null
+  const team = product.team ? teams.find(t => t.slug === product.team) : null
   const viewName = activeImg === 0 ? 'front' : 'back'
   const artCustom = team
     ? {}
@@ -242,7 +243,7 @@ export default function ProductDetails() {
                 style={zoomed ? { transform: 'scale(1.8)', transformOrigin: `${zoomPos.x}% ${zoomPos.y}%` } : {}}
               />
             ) : (
-              <ProductArt product={product} view={viewName} custom={product.category === 'jersey' ? jerseyCustom : artCustom} />
+              <ProductArt product={product} view={viewName} custom={['player_jersey', 'fan_jersey', 'retro_jersey'].includes(product.sizeChartType) ? jerseyCustom : artCustom} />
             )}
             <div className="absolute left-3 top-3 flex flex-col gap-1.5">
               {pct > 0 && <span className="bg-ember px-2 py-1 font-head text-xs font-semibold uppercase tracking-widest text-white">-{pct}%</span>}
@@ -288,7 +289,7 @@ export default function ProductDetails() {
           <h1 className="font-display text-5xl uppercase leading-none tracking-wide text-chalk">{product.name}</h1>
           <div className="mt-3 flex items-center gap-4">
             <Rating value={product.rating} count={product.numReviews} />
-            {product.team && TEAMS[product.team] && <span className="border border-line px-2 py-0.5 text-[11px] uppercase tracking-widest text-muted">{TEAMS[product.team].name}</span>}
+            {product.team && team && <span className="border border-line px-2 py-0.5 text-[11px] uppercase tracking-widest text-muted">{team.name}</span>}
           </div>
 
           <div className="mt-5 flex items-baseline gap-3">

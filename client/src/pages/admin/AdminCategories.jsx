@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { Plus, Pencil, Trash2, X, ChevronRight, ChevronDown, GripVertical, Eye, EyeOff } from 'lucide-react'
 import api from '../../lib/api'
 
-const EMPTY = { id: '', name: '', blurb: '', image: '', parent: null, displayOrder: 0 }
+const EMPTY = { name: '', blurb: '', autoBlurb: true, image: '', parent: null, displayOrder: 0 }
 
-function CategoryNode({ cat, depth = 0, onEdit, onDelete, onToggleActive, expanded, onToggle }) {
+function CategoryNode({ cat, depth = 0, onEdit, onDelete, onToggleActive, onAddChild, expanded, onToggle }) {
   const hasChildren = cat.children && cat.children.length > 0
   const isExpanded = expanded[cat._id]
 
@@ -19,9 +19,13 @@ function CategoryNode({ cat, depth = 0, onEdit, onDelete, onToggleActive, expand
         <div className="flex-1 min-w-0">
           <span className="font-head text-sm text-chalk">{cat.name}</span>
           <span className="ml-2 text-xs text-muted font-mono">({cat.id})</span>
+          {cat.blurb && <span className="ml-2 text-xs text-muted">— {cat.blurb}</span>}
           {!cat.isActive && <span className="ml-2 text-[10px] font-head uppercase tracking-widest text-ember bg-ember/10 px-1.5 py-0.5">inactive</span>}
         </div>
         <span className="text-xs text-muted">{cat.children?.length || 0} sub</span>
+        <button onClick={() => onAddChild(cat._id)} className="text-muted hover:text-volt p-1" title="Add subcategory">
+          <Plus size={14} />
+        </button>
         <button onClick={() => onToggleActive(cat)} className="text-muted hover:text-volt p-1" title={cat.isActive ? 'Deactivate' : 'Activate'}>
           {cat.isActive ? <Eye size={14} /> : <EyeOff size={14} />}
         </button>
@@ -31,7 +35,7 @@ function CategoryNode({ cat, depth = 0, onEdit, onDelete, onToggleActive, expand
       {hasChildren && isExpanded && cat.children.map(child => (
         <CategoryNode key={child._id} cat={child} depth={depth + 1}
           onEdit={onEdit} onDelete={onDelete} onToggleActive={onToggleActive}
-          expanded={expanded} onToggle={onToggle} />
+          onAddChild={onAddChild} expanded={expanded} onToggle={onToggle} />
       ))}
     </div>
   )
@@ -78,9 +82,9 @@ export default function AdminCategories() {
   const openEdit = (cat) => {
     setEditing(cat._id)
     setForm({
-      id: cat.id,
       name: cat.name,
       blurb: cat.blurb || '',
+      autoBlurb: cat.autoBlurb !== false,
       image: cat.image || '',
       parent: cat.parent || null,
       displayOrder: cat.displayOrder || 0,
@@ -161,6 +165,7 @@ export default function AdminCategories() {
           filteredTree.map(cat => (
             <CategoryNode key={cat._id} cat={cat} depth={0}
               onEdit={openEdit} onDelete={handleDelete} onToggleActive={handleToggleActive}
+              onAddChild={(parentId) => openNew(parentId)}
               expanded={expanded} onToggle={toggleExpand} />
           ))
         )}
@@ -177,20 +182,21 @@ export default function AdminCategories() {
             </div>
             <form onSubmit={save} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1">ID (slug)</label>
-                <input value={form.id} onChange={e => setForm({ ...form, id: e.target.value })} required
-                  disabled={editing !== 'new'}
-                  className={`input-fm ${editing !== 'new' ? 'opacity-50' : ''}`}
-                  placeholder="e.g. jersey, boots" />
-              </div>
-              <div>
                 <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1">Name</label>
                 <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required className="input-fm" />
               </div>
-              <div>
-                <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1">Blurb</label>
-                <input value={form.blurb} onChange={e => setForm({ ...form, blurb: e.target.value })} className="input-fm" />
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 text-sm text-chalk">
+                  <input type="checkbox" checked={form.autoBlurb} onChange={e => setForm({ ...form, autoBlurb: e.target.checked })} className="accent-volt" />
+                  Auto-generate blurb from children
+                </label>
               </div>
+              {!form.autoBlurb && (
+                <div>
+                  <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1">Custom Blurb</label>
+                  <input value={form.blurb} onChange={e => setForm({ ...form, blurb: e.target.value })} className="input-fm" placeholder="e.g. Club · National · Retro" />
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1">Image URL</label>
                 <input value={form.image} onChange={e => setForm({ ...form, image: e.target.value })} className="input-fm" />
@@ -199,7 +205,7 @@ export default function AdminCategories() {
                 <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1">Parent Category</label>
                 <select value={form.parent || ''} onChange={e => setForm({ ...form, parent: e.target.value || null })} className="input-fm">
                   <option value="">None (Root Category)</option>
-                  {flat.map(c => (
+                  {parentOptions.map(c => (
                     <option key={c._id} value={c._id}>{c.name} ({c.id})</option>
                   ))}
                 </select>
