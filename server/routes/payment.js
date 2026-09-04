@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import crypto from 'crypto'
-import SSLCommerzPayment from 'sslcommerz-lts'
+import axios from 'axios'
 import Order from '../models/Order.js'
 import PaymentAttempt from '../models/PaymentAttempt.js'
 import Product from '../models/Product.js'
@@ -9,24 +9,60 @@ import { sendEmail, buildOrderReceiptEmail } from '../services/email.js'
 
 const router = Router()
 
-const getSSLCommerz = () => {
-  if (!process.env.SSLCOMMERZ_STORE_ID || !process.env.SSLCOMMERZ_STORE_PASSWORD) {
-    return null
-  }
-  return new SSLCommerzPayment(
-    process.env.SSLCOMMERZ_STORE_ID,
-    process.env.SSLCOMMERZ_STORE_PASSWORD,
-    process.env.SSLCOMMERZ_IS_SANDBOX === 'true'
-  )
+const UDDOKTAPAY_API_KEY = process.env.UDDOKTAPAY_API_KEY || ''
+const UDDOKTAPAY_BASE_URL = process.env.UDDOKTAPAY_BASE_URL || 'https://sandbox.uddoktapay.com'
+const SITE_URL = process.env.SITE_URL || 'https://fleetmartbd.vercel.app'
+
+const isUddoktaPayConfigured = () => Boolean(UDDOKTAPAY_API_KEY)
+
+const uddoktapayRequest = async (endpoint, body) => {
+  const response = await axios.post(`${UDDOKTAPAY_BASE_URL}${endpoint}`, body, {
+    headers: {
+      'RT-UDDOKTAPAY-API-KEY': UDDOKTAPAY_API_KEY,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    timeout: 30000,
+  })
+  return response.data
 }
 
 const generateOrderId = () => `FM-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`
 const generateAttemptId = () => `PA-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`
 
-// POST /api/payment/initiate — create payment attempt + redirect to gateway
+// ── Shared: server-side amount recalculation ──
+const recalculateAmounts = async (items, couponCode) => {
+  const productIds = items.map(i => i.product)
+  const dbProducts = await Product.find({ _id: { $in: productIds } })
+  const productMap = Object.fromEntries(dbProducts.map(p => [p._id.toString(), p]))
+
+  let subtotal = 0
+  const validatedItems = items.map(i => {
+    const dbProduct = productMap[i.product]
+    const price = dbProduct ? dbProduct.price : i.price
+    const qty = Math.max(1, Math.floor(Number(i.qty) || 1))
+    subtotal += price * qty
+    return { ...i, price, qty }
+  })
+
+  const shippingFee = subtotal >= 3000 ? 0 : 80
+  let discount = 0
+  if (couponCode) {
+    const Coupon = (await import('../models/Coupon.js')).default
+    const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true })
+    if (coupon && (!coupon.expiresAt || coupon.expiresAt > new Date()) && (coupon.maxUses <= 0 || coupon.usedCount < coupon.maxUses) && subtotal >= coupon.minOrder) {
+      discount = coupon.discountType === 'percent' ? Math.round(subtotal * coupon.value / 100) : Math.min(coupon.value, subtotal)
+      await Coupon.updateOne({ _id: coupon._id }, { $inc: { usedCount: 1 } })
+    }
+  }
+  const grand = Math.max(0, subtotal + shippingFee - discount)
+  return { validatedItems, subtotal, shippingFee, discount, grand }
+}
+
+// POST /api/payment/initiate — create payment attempt + redirect to UddoktaPay
 router.post('/initiate', optionalAuth, async (req, res, next) => {
   try {
-    const { items, shipping, paymentMethod, paymentType, shippingMethod, couponCode, note, guestInfo } = req.body
+    const { items, shipping, paymentType, couponCode, note, guestInfo } = req.body
 
     if (!items || items.length === 0) {
       return res.status(400).json({ message: 'Order must contain at least one item' })
@@ -35,37 +71,13 @@ router.post('/initiate', optionalAuth, async (req, res, next) => {
     const user = req.user || null
     const guestEmail = !user ? guestInfo?.email : null
     const guestName = !user ? guestInfo?.name : null
-    const guestPhone = !user ? guestInfo?.phone : null
 
     if (!user && !guestEmail) {
       return res.status(400).json({ message: 'Email is required for guest checkout' })
     }
 
     // ── Server-side amount recalculation (never trust client totals) ──
-    const productIds = items.map(i => i.product)
-    const dbProducts = await Product.find({ _id: { $in: productIds } })
-    const productMap = Object.fromEntries(dbProducts.map(p => [p._id.toString(), p]))
-
-    let subtotal = 0
-    const validatedItems = items.map(i => {
-      const dbProduct = productMap[i.product]
-      const price = dbProduct ? dbProduct.price : i.price
-      const qty = Math.max(1, Math.floor(Number(i.qty) || 1))
-      subtotal += price * qty
-      return { ...i, price, qty }
-    })
-
-    const shippingFee = subtotal >= 3000 ? 0 : 80
-    let discount = 0
-    if (couponCode) {
-      const Coupon = (await import('../models/Coupon.js')).default
-      const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true })
-      if (coupon && (!coupon.expiresAt || coupon.expiresAt > new Date()) && (coupon.maxUses <= 0 || coupon.usedCount < coupon.maxUses) && subtotal >= coupon.minOrder) {
-        discount = coupon.discountType === 'percent' ? Math.round(subtotal * coupon.value / 100) : Math.min(coupon.value, subtotal)
-        await Coupon.updateOne({ _id: coupon._id }, { $inc: { usedCount: 1 } })
-      }
-    }
-    const grand = Math.max(0, subtotal + shippingFee - discount)
+    const { validatedItems, subtotal, shippingFee, discount, grand } = await recalculateAmounts(items, couponCode)
     const amountToPay = paymentType === 'partial' ? Math.min(300, grand) : grand
     const attemptId = generateAttemptId()
 
@@ -84,13 +96,13 @@ router.post('/initiate', optionalAuth, async (req, res, next) => {
       shippingAddress: {
         label: 'Delivery',
         name: shipping?.name || guestName || '',
-        phone: shipping?.phone || guestPhone || '',
+        phone: shipping?.phone || guestInfo?.phone || '',
         street: shipping?.street || '',
         city: shipping?.city || '',
         zip: shipping?.zip || '',
         country: shipping?.country || 'Bangladesh',
       },
-      paymentMethod: paymentMethod || 'sslcommerz',
+      paymentMethod: 'uddoktapay',
       paymentType: paymentType || 'full',
       subtotal,
       shippingFee,
@@ -102,8 +114,7 @@ router.post('/initiate', optionalAuth, async (req, res, next) => {
       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
     })
 
-    const sslcz = getSSLCommerz()
-    if (!sslcz) {
+    if (!isUddoktaPayConfigured()) {
       return res.status(503).json({
         message: 'Payment gateway is not configured. Please use Cash on Delivery.',
         attemptId,
@@ -111,93 +122,107 @@ router.post('/initiate', optionalAuth, async (req, res, next) => {
       })
     }
 
-    const tranId = `FM_${attemptId}_${Date.now()}`
-
-    const data = {
-      total_amount: amountToPay,
-      currency: 'BDT',
-      tran_id: tranId,
-      success_url: `${req.headers.origin || 'https://fleetmartbd.vercel.app'}/api/payment/success`,
-      fail_url: `${req.headers.origin || 'https://fleetmartbd.vercel.app'}/api/payment/fail`,
-      cancel_url: `${req.headers.origin || 'https://fleetmartbd.vercel.app'}/api/payment/cancel`,
-      ipn_url: `${req.headers.origin || 'https://fleetmartbd.vercel.app'}/api/payment/ipn`,
-      shipping_method: 'Courier',
-      product_name: validatedItems.map(i => i.name).join(', '),
-      product_category: 'E-Commerce',
-      product_profile: 'general',
-      cus_name: shipping?.name || guestName || user?.name || 'Customer',
-      cus_email: guestEmail || user?.email || '',
-      cus_add1: shipping?.street || '',
-      cus_city: shipping?.city || '',
-      cus_postcode: shipping?.zip || '',
-      cus_country: 'Bangladesh',
-      cus_phone: shipping?.phone || guestPhone || '',
-    }
+    const customerName = shipping?.name || guestName || user?.name || 'Customer'
+    const customerEmail = guestEmail || user?.email || ''
 
     try {
-      const sslResponse = await sslcz.init(data)
-      if (sslResponse?.GatewayPageURL) {
-        attempt.transactionId = tranId
-        attempt.sslCommerzPayload = sslResponse
+      const uddoktaResponse = await uddoktapayRequest('/api/checkout-v2', {
+        full_name: customerName,
+        email: customerEmail,
+        amount: String(amountToPay),
+        metadata: JSON.stringify({ attemptId }),
+        redirect_url: `${SITE_URL}/api/payment/success`,
+        return_type: 'POST',
+        cancel_url: `${SITE_URL}/api/payment/cancel`,
+        webhook_url: `${SITE_URL}/api/payment/ipn`,
+      })
+
+      if (uddoktaResponse.status && uddoktaResponse.payment_url) {
+        attempt.invoiceId = null // will be set on success callback
+        attempt.uddoktapayPayload = uddoktaResponse
         await attempt.save()
         return res.json({
-          gatewayUrl: sslResponse.GatewayPageURL,
+          gatewayUrl: uddoktaResponse.payment_url,
           attemptId,
-          tranId,
         })
       } else {
-        return res.status(500).json({ message: 'Failed to connect to payment gateway', attemptId })
+        attempt.status = 'failed'
+        await attempt.save()
+        return res.status(500).json({ message: uddoktaResponse.message || 'Failed to connect to payment gateway', attemptId })
       }
     } catch (gatewayErr) {
       attempt.status = 'failed'
       await attempt.save()
-      return res.status(500).json({ message: 'Payment gateway error. Please try again.', attemptId })
+      const msg = gatewayErr.response?.data?.message || 'Payment gateway error. Please try again.'
+      return res.status(500).json({ message: msg, attemptId })
     }
   } catch (err) { next(err) }
 })
 
-// POST /api/payment/success — SSLCommerz success callback
+// POST /api/payment/success — UddoktaPay success callback (receives invoice_id via POST)
 router.post('/success', async (req, res, next) => {
   try {
-    const { tran_id, val_id } = req.body
+    const { invoice_id } = req.body
 
-    const sslcz = getSSLCommerz()
-    if (!sslcz) {
-      return res.redirect('/checkout?payment=error')
+    if (!invoice_id) {
+      return res.redirect(`${SITE_URL}/checkout?payment=error`)
     }
 
-    let validation
+    if (!isUddoktaPayConfigured()) {
+      return res.redirect(`${SITE_URL}/checkout?payment=error`)
+    }
+
+    // ── Verify payment with UddoktaPay ──
+    let verification
     try {
-      validation = await sslcz.validate({ tran_id, val_id })
+      verification = await uddoktapayRequest('/api/verify-payment', { invoice_id })
     } catch {
-      return res.redirect('/checkout?payment=error')
+      return res.redirect(`${SITE_URL}/checkout?payment=error`)
     }
 
-    if (validation.status !== 'VALID') {
-      return res.redirect('/checkout?payment=failed')
+    if (verification.status !== 'COMPLETED') {
+      return res.redirect(`${SITE_URL}/checkout?payment=failed`)
     }
 
-    const attempt = await PaymentAttempt.findOne({ transactionId: tran_id, status: { $in: ['pending', 'processing'] } })
+    // ── Find the payment attempt by attemptId from metadata ──
+    const metadata = typeof verification.metadata === 'string' ? JSON.parse(verification.metadata) : verification.metadata
+    const attemptId = metadata?.attemptId
+
+    if (!attemptId) {
+      return res.redirect(`${SITE_URL}/checkout?payment=error`)
+    }
+
+    const attempt = await PaymentAttempt.findOne({ attemptId, status: { $in: ['pending', 'processing'] } })
     if (!attempt) {
-      return res.redirect('/checkout?payment=expired')
+      // Check if already processed (idempotent)
+      const existing = await PaymentAttempt.findOne({ attemptId, status: 'completed' })
+      if (existing?.orderId) {
+        return res.redirect(`${SITE_URL}/order/success?orderId=${existing.orderId}`)
+      }
+      return res.redirect(`${SITE_URL}/checkout?payment=expired`)
     }
 
     if (new Date() > attempt.expiresAt) {
       attempt.status = 'expired'
       await attempt.save()
-      return res.redirect('/checkout?payment=expired')
+      return res.redirect(`${SITE_URL}/checkout?payment=expired`)
     }
 
-    const alreadyProcessed = await PaymentAttempt.findOne({ transactionId: tran_id, status: 'completed' })
-    if (alreadyProcessed) {
-      return res.redirect(`/order/success?orderId=${alreadyProcessed.orderId}`)
+    // ── Verify amount matches (prevent tampering) ──
+    const verifiedAmount = parseFloat(verification.amount)
+    if (Math.abs(verifiedAmount - attempt.amountToPay) > 0.01) {
+      attempt.status = 'failed'
+      await attempt.save()
+      return res.redirect(`${SITE_URL}/checkout?payment=failed`)
     }
 
+    // ── Mark attempt as completed ──
     attempt.status = 'completed'
-    attempt.transactionId = tran_id
+    attempt.invoiceId = invoice_id
     attempt.completedAt = new Date()
     await attempt.save()
 
+    // ── Create Order ──
     const orderId = generateOrderId()
     const amountPaid = attempt.amountToPay
     const remainingAmount = attempt.paymentType === 'partial' ? attempt.total - amountPaid : 0
@@ -210,7 +235,7 @@ router.post('/success', async (req, res, next) => {
       guestPhone: attempt.shippingAddress?.phone || null,
       items: attempt.items,
       shippingAddress: attempt.shippingAddress,
-      paymentMethod: attempt.paymentMethod,
+      paymentMethod: 'uddoktapay',
       paymentType: attempt.paymentType,
       amountPaid,
       remainingAmount,
@@ -222,7 +247,7 @@ router.post('/success', async (req, res, next) => {
       total: attempt.total,
       couponCode: attempt.couponCode,
       note: attempt.note,
-      transactionId: tran_id,
+      transactionId: verification.transaction_id || invoice_id,
       paymentAttemptId: attempt.attemptId,
       paymentVerifiedAt: new Date(),
       statusHistory: [
@@ -231,6 +256,7 @@ router.post('/success', async (req, res, next) => {
       ],
     })
 
+    // ── Atomic stock deduction ──
     for (const item of attempt.items) {
       if (item.product && item.size) {
         await Product.updateOne(
@@ -243,6 +269,7 @@ router.post('/success', async (req, res, next) => {
     attempt.orderId = orderId
     await attempt.save()
 
+    // ── Send receipt email ──
     const receiptHtml = buildOrderReceiptEmail(order)
     const recipientEmail = order.user?.email || order.guestEmail
     if (recipientEmail) {
@@ -250,58 +277,64 @@ router.post('/success', async (req, res, next) => {
         .catch((err) => console.error(`[EMAIL] Receipt failed | Order: ${orderId} | Error: ${err.message}`))
     }
 
-    res.redirect(`https://fleetmartbd.vercel.app/order/success?orderId=${orderId}`)
+    res.redirect(`${SITE_URL}/order/success?orderId=${orderId}`)
   } catch (err) { next(err) }
 })
 
-// POST /api/payment/fail
-router.post('/fail', async (req, res) => {
-  const { tran_id } = req.body
-  if (tran_id) {
-    await PaymentAttempt.findOneAndUpdate({ transactionId: tran_id }, { status: 'failed' })
-  }
-  res.redirect('https://fleetmartbd.vercel.app/checkout?payment=failed')
-})
-
-// POST /api/payment/cancel
+// POST /api/payment/cancel — UddoktaPay cancel callback
 router.post('/cancel', async (req, res) => {
-  const { tran_id } = req.body
-  if (tran_id) {
-    await PaymentAttempt.findOneAndUpdate({ transactionId: tran_id }, { status: 'cancelled' })
-  }
-  res.redirect('https://fleetmartbd.vercel.app/checkout?payment=cancelled')
+  try {
+    const { invoice_id } = req.body
+    if (invoice_id) {
+      // Try to find attempt by invoice_id and mark cancelled
+      const attempt = await PaymentAttempt.findOne({ invoiceId: invoice_id })
+      if (attempt) {
+        attempt.status = 'cancelled'
+        await attempt.save()
+      }
+    }
+  } catch { /* best effort */ }
+  res.redirect(`${SITE_URL}/checkout?payment=cancelled`)
 })
 
-// POST /api/payment/ipn — Instant Payment Notification
+// POST /api/payment/ipn — Instant Payment Notification (webhook from UddoktaPay)
 router.post('/ipn', async (req, res) => {
   try {
-    const { tran_id, status } = req.body
-    const sslcz = getSSLCommerz()
-    if (!sslcz) return res.status(503).json({ message: 'Not configured' })
+    const { invoice_id } = req.body
 
-    const validation = await sslcz.validate({ tran_id, val_id: req.body.val_id })
-    if (validation.status === 'VALID') {
-      const attempt = await PaymentAttempt.findOne({ transactionId: tran_id, status: 'completed' })
-      if (attempt?.orderId) {
-        res.json({ message: 'Already processed' })
-      } else {
-        res.json({ message: 'IPN received' })
-      }
-    } else {
-      res.status(400).json({ message: 'Invalid payment' })
+    if (!invoice_id || !isUddoktaPayConfigured()) {
+      return res.status(400).json({ message: 'Invalid request' })
     }
+
+    // Verify with UddoktaPay
+    const verification = await uddoktapayRequest('/api/verify-payment', { invoice_id })
+
+    if (verification.status === 'COMPLETED') {
+      const metadata = typeof verification.metadata === 'string' ? JSON.parse(verification.metadata) : verification.metadata
+      const attemptId = metadata?.attemptId
+
+      if (attemptId) {
+        const attempt = await PaymentAttempt.findOne({ attemptId })
+        if (attempt?.orderId) {
+          return res.json({ message: 'Already processed' })
+        }
+        // IPN received but primary processing happens in /success
+        return res.json({ message: 'IPN received' })
+      }
+    }
+
+    res.json({ message: 'IPN received' })
   } catch {
     res.status(500).json({ message: 'IPN processing failed' })
   }
 })
 
-// GET /api/payment/status/:attemptId — check payment status (owner or admin only)
+// GET /api/payment/status/:attemptId — check payment status (owner/admin/guest only)
 router.get('/status/:attemptId', optionalAuth, async (req, res, next) => {
   try {
     const attempt = await PaymentAttempt.findOne({ attemptId: req.params.attemptId })
     if (!attempt) return res.status(404).json({ message: 'Payment attempt not found' })
 
-    // Access control: owner, admin, or guest with matching email
     const isOwner = req.user && attempt.user?.toString() === req.user._id.toString()
     const isAdmin = req.user?.role === 'admin'
     const isGuest = !req.user && attempt.guestEmail && req.query.email === attempt.guestEmail
@@ -322,7 +355,7 @@ router.get('/status/:attemptId', optionalAuth, async (req, res, next) => {
 // POST /api/payment/cod — create order for COD (no gateway)
 router.post('/cod', optionalAuth, async (req, res, next) => {
   try {
-    const { items, shipping, paymentType, shippingMethod, couponCode, note, guestInfo } = req.body
+    const { items, shipping, paymentType, couponCode, note, guestInfo } = req.body
 
     if (!items || items.length === 0) {
       return res.status(400).json({ message: 'Order must contain at least one item' })
@@ -336,30 +369,7 @@ router.post('/cod', optionalAuth, async (req, res, next) => {
     }
 
     // ── Server-side amount recalculation ──
-    const productIds = items.map(i => i.product)
-    const dbProducts = await Product.find({ _id: { $in: productIds } })
-    const productMap = Object.fromEntries(dbProducts.map(p => [p._id.toString(), p]))
-
-    let subtotal = 0
-    const validatedItems = items.map(i => {
-      const dbProduct = productMap[i.product]
-      const price = dbProduct ? dbProduct.price : i.price
-      const qty = Math.max(1, Math.floor(Number(i.qty) || 1))
-      subtotal += price * qty
-      return { ...i, price, qty }
-    })
-
-    const shippingFee = subtotal >= 3000 ? 0 : 80
-    let discount = 0
-    if (couponCode) {
-      const Coupon = (await import('../models/Coupon.js')).default
-      const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true })
-      if (coupon && (!coupon.expiresAt || coupon.expiresAt > new Date()) && (coupon.maxUses <= 0 || coupon.usedCount < coupon.maxUses) && subtotal >= coupon.minOrder) {
-        discount = coupon.discountType === 'percent' ? Math.round(subtotal * coupon.value / 100) : Math.min(coupon.value, subtotal)
-        await Coupon.updateOne({ _id: coupon._id }, { $inc: { usedCount: 1 } })
-      }
-    }
-    const grand = Math.max(0, subtotal + shippingFee - discount)
+    const { validatedItems, subtotal, shippingFee, discount, grand } = await recalculateAmounts(items, couponCode)
     const orderId = generateOrderId()
     const amountPaid = paymentType === 'partial' ? Math.min(300, grand) : 0
     const remainingAmount = grand - amountPaid

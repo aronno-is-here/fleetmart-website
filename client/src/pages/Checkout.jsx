@@ -246,7 +246,7 @@ export default function Checkout() {
                 <p className="font-head text-sm font-semibold uppercase tracking-widest text-chalk">Payment Method</p>
                 {[
                   { id: 'cod', icon: <Wallet size={18} />, title: 'Cash on Delivery', sub: 'Pay when the gear arrives' },
-                  { id: 'sslcommerz', icon: <CreditCard size={18} />, title: 'Online Payment (bKash/Nagad/Card)', sub: 'Pay now via SSLCommerz' },
+                  { id: 'uddoktapay', icon: <CreditCard size={18} />, title: 'Online Payment (bKash/Nagad/Card)', sub: 'Pay now via UddoktaPay' },
                 ].map((o) => (
                   <button key={o.id} onClick={() => setMethod(o.id)} className={`flex w-full items-center gap-4 border p-4 text-left transition-colors ${method === o.id ? 'border-volt bg-volt/5' : 'border-line hover:border-volt/50'}`}>
                     <span className="text-volt">{o.icon}</span>
@@ -298,7 +298,7 @@ export default function Checkout() {
               </ul>
               <div className="grid gap-2 text-sm text-muted sm:grid-cols-2">
                 <p><span className="uppercase tracking-widest text-xs block text-muted">Ship to</span>{addr.name || '—'} · {addr.phone}<br />{addr.street}, {addr.city}</p>
-                <p><span className="uppercase tracking-widest text-xs block text-muted">Method</span>{ship === 'express' ? 'Express delivery' : 'Standard delivery'}<br />Paying via {method === 'cod' ? 'Cash on Delivery' : 'SSLCommerz'} ({paymentType === 'partial' ? 'Partial' : 'Full'})</p>
+                <p><span className="uppercase tracking-widest text-xs block text-muted">Method</span>{ship === 'express' ? 'Express delivery' : 'Standard delivery'}<br />Paying via {method === 'cod' ? 'Cash on Delivery' : 'UddoktaPay'} ({paymentType === 'partial' ? 'Partial' : 'Full'})</p>
               </div>
               {paymentType === 'partial' && (
                 <div className="border border-volt/30 bg-volt/5 p-4 text-sm">

@@ -24,7 +24,7 @@ const orderSchema = new mongoose.Schema({
     zip: String,
     country: String,
   },
-  paymentMethod: { type: String, enum: ['cod', 'bkash', 'nagad', 'card', 'sslcommerz'], default: 'cod' },
+  paymentMethod: { type: String, enum: ['cod', 'uddoktapay'], default: 'cod' },
   paymentType: { type: String, enum: ['partial', 'full'], default: 'full' },
   amountPaid: { type: Number, default: 0 },
   remainingAmount: { type: Number, default: 0 },

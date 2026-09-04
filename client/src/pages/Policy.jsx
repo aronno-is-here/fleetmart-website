@@ -32,7 +32,7 @@ const CONTENT = {
     title: 'Privacy Policy',
     body: [
       'We collect only what is needed to fulfil your order: name, contact, delivery address, and order history.',
-      'Payment credentials are processed by certified gateways (SSLCommerz/bKash) — Fleetmart never stores card numbers.',
+      'Payment credentials are processed by certified gateways (UddoktaPay/bKash) — Fleetmart never stores card numbers.',
       'We never sell your personal data. Analytics are aggregated and anonymized.',
       'You may request export or deletion of your data anytime via support@fleetmart.com.',
     ],
