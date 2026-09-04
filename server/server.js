@@ -24,6 +24,7 @@ import adminRoutes from './routes/admin.js'
 import analyticsRoutes from './routes/analytics.js'
 import uploadRoutes from './routes/upload.js'
 import paymentRoutes from './routes/payment.js'
+import ensureDemoProduct from './startup/ensureDemoProduct.js'
 
 // Validate required env vars
 const requiredEnv = ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'MONGODB_URI']
@@ -97,6 +98,7 @@ if (process.env.VERCEL) {
       try {
         await connectDB()
         dbConnected = true
+        ensureDemoProduct()
       } catch (err) {
         console.error('Database connection failed:', err.message)
       }
@@ -146,6 +148,7 @@ process.on('uncaughtException', (err) => {
 // Start
 if (!process.env.VERCEL) {
   connectDB().then(() => {
+    ensureDemoProduct()
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
   })
 }
