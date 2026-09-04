@@ -109,11 +109,14 @@ export default function Footer() {
             <li>
               <Link to="/about" className="text-sm text-muted transition-colors hover:text-volt">About Us</Link>
             </li>
-            {CATEGORIES.find(c => c.id === 'turf') && (
-              <li>
-                <Link to={`/shop?category=turf`} className="text-sm text-muted transition-colors hover:text-volt">Turf Installation</Link>
-              </li>
-            )}
+            {(() => {
+              const turfCat = CATEGORIES.find(c => c.name.toLowerCase().includes('turf'))
+              return turfCat ? (
+                <li>
+                  <Link to={`/shop?category=${turfCat.id}`} className="text-sm text-muted transition-colors hover:text-volt">Turf Installation</Link>
+                </li>
+              ) : null
+            })()}
             <li>
               <Link to="/policies/terms" className="text-sm text-muted transition-colors hover:text-volt">Terms of Service</Link>
             </li>

@@ -108,7 +108,8 @@ export default function Shop() {
   }
 
   const activeCat = CATEGORIES.find((c) => c.id === cat)
-  const sizeOptions = cat === 'boots' ? BOOT_SIZES : [...new Set([...SIZES, ...BOOT_SIZES])]
+  const isFootwear = products.some(p => p.sizeChartType === 'boot')
+  const sizeOptions = isFootwear ? BOOT_SIZES : [...new Set([...SIZES, ...BOOT_SIZES])]
 
   const clearAll = () => setParams(new URLSearchParams(), { replace: true })
   const priceActive = minPrice > PRICE_ABS_MIN || maxPrice < PRICE_ABS_MAX

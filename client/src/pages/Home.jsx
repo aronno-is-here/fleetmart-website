@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { ArrowRight, ChevronLeft, ChevronRight, Timer, Quote } from 'lucide-react'
 import { useFlatCategories } from '../hooks/useCategories'
 import { useTeams } from '../hooks/useTeams'
+import { useBrands } from '../hooks/useBrands'
 import { ProductArt, JerseyArt, BootArt } from '../components/ProductArt'
 import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
 import SectionHeading from '../components/ui/SectionHeading'
@@ -28,7 +29,7 @@ function Hero() {
 
   const hasBanners = banners.length > 0
   const slideCount = hasBanners ? banners.length : 1
-  const jerseyCat = CATEGORIES.find(c => c.id === 'jersey')
+  const firstCat = CATEGORIES.length > 0 ? CATEGORIES[0] : null
   const firstTeam = teams.length > 0 ? teams[0] : null
 
   useEffect(() => {
@@ -63,8 +64,8 @@ function Hero() {
             Official club & national jerseys with custom name and number printing. Printed in hours, not days.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            {jerseyCat && (
-              <Link to={`/shop?category=${jerseyCat.id}`} className="btn-volt">
+            {firstCat && (
+              <Link to={`/shop?category=${firstCat.id}`} className="btn-volt">
                 Shop Jerseys <ArrowRight size={16} />
               </Link>
             )}
@@ -277,15 +278,16 @@ function FlashDeal() {
 }
 
 function BrandStrip() {
-  const brands = ['FLEETMART PRO', 'STRIKERX', 'VELOCITA', 'NORTHWALL', 'TITANGRIP']
+  const { brands } = useBrands()
+  if (!brands.length) return null
   return (
     <section className="overflow-hidden border-y border-line bg-pitch py-6">
       <div className="flex w-max animate-marquee gap-16 whitespace-nowrap">
         {[0, 1].map((half) => (
           <div key={half} className="flex gap-16">
             {brands.map((b) => (
-              <span key={`${half}-${b}`} className="font-display text-3xl tracking-wider text-chalk/25 transition-colors hover:text-volt">
-                {b}
+              <span key={`${half}-${b._id}`} className="font-display text-3xl tracking-wider text-chalk/25 transition-colors hover:text-volt">
+                {b.name}
               </span>
             ))}
           </div>
