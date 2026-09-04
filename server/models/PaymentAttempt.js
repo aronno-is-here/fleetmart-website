@@ -7,7 +7,7 @@ const paymentAttemptSchema = new mongoose.Schema({
   guestEmail: { type: String, default: null },
   items: [{ type: mongoose.Schema.Types.Mixed }],
   shippingAddress: { type: mongoose.Schema.Types.Mixed },
-  paymentMethod: { type: String, enum: ['cod', 'uddoktapay'] },
+  paymentMethod: { type: String, enum: ['uddoktapay'] },
   paymentType: { type: String, enum: ['partial', 'full'], default: 'full' },
   subtotal: { type: Number, required: true },
   shippingFee: { type: Number, default: 0 },

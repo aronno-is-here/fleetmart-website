@@ -1,10 +1,29 @@
 import { Router } from 'express'
+import axios from 'axios'
 import Order from '../models/Order.js'
 import Product from '../models/Product.js'
 import Coupon from '../models/Coupon.js'
 import { protect, adminOnly } from '../middleware/auth.js'
 import { sendEmail } from '../services/email.js'
 import { escapeRegex, escapeHtml } from '../utils/sanitize.js'
+import { processRefund } from '../services/refund.js'
+
+const UDDOKTAPAY_API_KEY = process.env.UDDOKTAPAY_API_KEY || ''
+const UDDOKTAPAY_BASE_URL = process.env.UDDOKTAPAY_BASE_URL || 'https://sandbox.uddoktapay.com'
+
+const isUddoktaPayConfigured = () => Boolean(UDDOKTAPAY_API_KEY)
+
+const uddoktapayRequest = async (endpoint, body) => {
+  const response = await axios.post(`${UDDOKTAPAY_BASE_URL}${endpoint}`, body, {
+    headers: {
+      'RT-UDDOKTAPAY-API-KEY': UDDOKTAPAY_API_KEY,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    timeout: 30000,
+  })
+  return response.data
+}
 
 const router = Router()
 
@@ -75,6 +94,19 @@ router.put('/:id/status', protect, adminOnly, async (req, res, next) => {
     if (status === 'delivered' && order.paymentStatus !== 'paid') order.paymentStatus = 'paid'
     await order.save()
 
+    // ── Auto-refund when admin cancels a paid/partial order ──
+    if (status === 'cancelled' && ['paid', 'partial'].includes(order.paymentStatus)) {
+      const refundResult = await processRefund(order, {
+        reason: note || 'Order cancelled by admin',
+        context: 'admin_cancel',
+        uddoktapayRequest,
+        isConfigured: isUddoktaPayConfigured,
+      })
+      if (!refundResult.ok) {
+        console.warn(`[ORDER] Auto-refund failed on cancel | Order: ${order.orderId} | Reason: ${refundResult.message}`)
+      }
+    }
+
     const recipientEmail = order.user?.email || order.guestEmail
     if (recipientEmail) {
       const customerName = order.user?.name || order.guestName || 'Customer'
@@ -107,6 +139,10 @@ router.post('/', protect, async (req, res, next) => {
       return res.status(400).json({ message: 'Order must contain at least one item' })
     }
 
+    if (paymentMethod && paymentMethod !== 'uddoktapay') {
+      return res.status(400).json({ message: 'Invalid payment method' })
+    }
+
     const crypto = await import('crypto')
     const orderId = `FM-${Date.now().toString(36).toUpperCase()}-${crypto.default.randomBytes(3).toString('hex').toUpperCase()}`
 
@@ -130,7 +166,7 @@ router.post('/', protect, async (req, res, next) => {
         phone: shipping?.phone || '',
         name: shipping?.name || '',
       },
-      paymentMethod: paymentMethod || 'cod',
+      paymentMethod: 'uddoktapay',
       paymentType: 'full',
       amountPaid: 0,
       remainingAmount: totals?.grand || 0,
@@ -141,7 +177,7 @@ router.post('/', protect, async (req, res, next) => {
       couponCode: couponCode || null,
       note: note || '',
       statusHistory: [{ status: 'processing', timestamp: new Date() }],
-      paymentStatus: paymentMethod === 'cod' ? 'pending' : 'pending',
+      paymentStatus: 'pending',
     })
 
     for (const item of items) {

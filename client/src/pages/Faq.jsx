@@ -5,7 +5,7 @@ const FAQS = [
   ['How long does delivery take?', 'Dhaka city: 24–48 hours. Outside Dhaka: 2–4 working days via our courier partners. You get SMS tracking at every step.'],
   ['How does jersey customization work?', 'Pick any customizable jersey, enter your name and number on the product page, and watch the live preview. Pro-grade vinyl printing adds ৳150 and ships within 24 hours.'],
   ['Can I return a customized jersey?', 'Customized items are returnable only for printing defects or wrong size due to our error. Standard (non-customized) items have a full 7-day return window.'],
-  ['What payment methods do you accept?', 'bKash, Nagad, all major cards (via UddoktaPay), and Cash on Delivery nationwide.'],
+  ['What payment methods do you accept?', 'bKash and Nagad via UddoktaPay. Pay in full or choose partial payment (৳300 upfront).'],
   ['Are the jerseys authentic?', 'Every kit passes our 3-point authenticity check — official fabric weight, heat-pressed crest verification, and colour-lock testing. Guaranteed on every invoice.'],
   ['Do you offer team/bulk discounts?', 'Yes — orders of 10+ kits get tiered discounts and free squad printing. Contact us with your squad list for a quote within 24 hours.'],
   ['Do you install artificial turf?', 'Yes. We supply 50mm premier turf and offer end-to-end installation — site measurement within 48 hours, and quotes are free.'],

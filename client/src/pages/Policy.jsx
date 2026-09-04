@@ -15,7 +15,7 @@ const CONTENT = {
     body: [
       '7-day return window on unworn, unwashed items with original tags and packaging.',
       'Customized jerseys are only returnable for printing defects or size errors on our side.',
-      'Refunds are processed within 3–5 working days to your bKash/Nagad/card. COD orders are refunded via mobile banking.',
+      'Refunds are processed within 3–5 working days to your bKash/Nagad.',
       'Wrong item received? We pick it up free of charge and ship the correct one immediately.',
     ],
   },

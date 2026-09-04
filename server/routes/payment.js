@@ -6,12 +6,15 @@ import PaymentAttempt from '../models/PaymentAttempt.js'
 import Product from '../models/Product.js'
 import { protect, optionalAuth, adminOnly } from '../middleware/auth.js'
 import { sendEmail, buildOrderReceiptEmail } from '../services/email.js'
+import { processRefund } from '../services/refund.js'
 
 const router = Router()
 
 const UDDOKTAPAY_API_KEY = process.env.UDDOKTAPAY_API_KEY || ''
 const UDDOKTAPAY_BASE_URL = process.env.UDDOKTAPAY_BASE_URL || 'https://sandbox.uddoktapay.com'
 const SITE_URL = process.env.SITE_URL || 'https://fleetmartbd.vercel.app'
+
+const PARTIAL_PAYMENT_AMOUNT = 300
 
 const isUddoktaPayConfigured = () => Boolean(UDDOKTAPAY_API_KEY)
 
@@ -76,9 +79,13 @@ router.post('/initiate', optionalAuth, async (req, res, next) => {
       return res.status(400).json({ message: 'Email is required for guest checkout' })
     }
 
+    if (!paymentType || !['partial', 'full'].includes(paymentType)) {
+      return res.status(400).json({ message: 'Invalid payment type. Choose partial or full.' })
+    }
+
     // ── Server-side amount recalculation (never trust client totals) ──
     const { validatedItems, subtotal, shippingFee, discount, grand } = await recalculateAmounts(items, couponCode)
-    const amountToPay = paymentType === 'partial' ? Math.min(300, grand) : grand
+    const amountToPay = paymentType === 'partial' ? Math.min(PARTIAL_PAYMENT_AMOUNT, grand) : grand
     const attemptId = generateAttemptId()
 
     const attempt = await PaymentAttempt.create({
@@ -116,7 +123,7 @@ router.post('/initiate', optionalAuth, async (req, res, next) => {
 
     if (!isUddoktaPayConfigured()) {
       return res.status(503).json({
-        message: 'Payment gateway is not configured. Please use Cash on Delivery.',
+        message: 'Payment gateway is not configured. Please try again later.',
         attemptId,
         amountToPay,
       })
@@ -126,7 +133,7 @@ router.post('/initiate', optionalAuth, async (req, res, next) => {
     const customerEmail = guestEmail || user?.email || ''
 
     try {
-      const uddoktaResponse = await uddoktapayRequest('/api/checkout-v2', {
+      const uddoktaResponse = await uddoktapayRequest('/checkout-v2', {
         full_name: customerName,
         email: customerEmail,
         amount: String(amountToPay),
@@ -175,7 +182,7 @@ router.post('/success', async (req, res, next) => {
     // ── Verify payment with UddoktaPay ──
     let verification
     try {
-      verification = await uddoktapayRequest('/api/verify-payment', { invoice_id })
+      verification = await uddoktapayRequest('/verify-payment', { invoice_id })
     } catch {
       return res.redirect(`${SITE_URL}/checkout?payment=error`)
     }
@@ -236,6 +243,7 @@ router.post('/success', async (req, res, next) => {
       items: attempt.items,
       shippingAddress: attempt.shippingAddress,
       paymentMethod: 'uddoktapay',
+      paymentGatewayMethod: verification.payment_method || null,
       paymentType: attempt.paymentType,
       amountPaid,
       remainingAmount,
@@ -302,7 +310,6 @@ router.post('/cancel', async (req, res) => {
   try {
     const { invoice_id } = req.body
     if (invoice_id) {
-      // Try to find attempt by invoice_id and mark cancelled
       const attempt = await PaymentAttempt.findOne({ invoiceId: invoice_id })
       if (attempt) {
         attempt.status = 'cancelled'
@@ -320,7 +327,7 @@ router.post('/ipn', async (req, res) => {
       return res.status(400).json({ message: 'Payment gateway not configured' })
     }
 
-    // ── FIX 2: Timing-safe API key validation ──
+    // ── Timing-safe API key validation ──
     const incomingKey = req.headers['rt-uddoktapay-api-key'] || ''
     if (!incomingKey || incomingKey.length !== UDDOKTAPAY_API_KEY.length) {
       return res.status(403).json({ message: 'Invalid API key' })
@@ -331,7 +338,7 @@ router.post('/ipn', async (req, res) => {
       return res.status(403).json({ message: 'Invalid API key' })
     }
 
-    // ── FIX 3: Read full webhook payload ──
+    // ── Read full webhook payload ──
     const {
       invoice_id,
       full_name,
@@ -352,7 +359,7 @@ router.post('/ipn', async (req, res) => {
     }
 
     // ── Server-side verification remains authoritative ──
-    const verification = await uddoktapayRequest('/api/verify-payment', { invoice_id })
+    const verification = await uddoktapayRequest('/verify-payment', { invoice_id })
 
     if (verification.status === 'COMPLETED') {
       const metadata = typeof verification.metadata === 'string' ? JSON.parse(verification.metadata) : verification.metadata
@@ -398,92 +405,39 @@ router.get('/status/:attemptId', optionalAuth, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// POST /api/payment/cod — create order for COD (no gateway)
-router.post('/cod', optionalAuth, async (req, res, next) => {
+// POST /api/payment/refund — request refund for a paid order
+router.post('/refund', protect, async (req, res, next) => {
   try {
-    const { items, shipping, paymentType, couponCode, note, guestInfo } = req.body
+    const { orderId, reason } = req.body
 
-    if (!items || items.length === 0) {
-      return res.status(400).json({ message: 'Order must contain at least one item' })
+    if (!orderId) {
+      return res.status(400).json({ message: 'Order ID is required' })
     }
 
-    const user = req.user || null
-    const guestEmail = !user ? guestInfo?.email : null
-
-    if (!user && !guestEmail) {
-      return res.status(400).json({ message: 'Email is required for guest checkout' })
+    const order = await Order.findOne({ orderId })
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' })
     }
 
-    // ── Server-side amount recalculation ──
-    const { validatedItems, subtotal, shippingFee, discount, grand } = await recalculateAmounts(items, couponCode)
-    const orderId = generateOrderId()
-    const amountPaid = paymentType === 'partial' ? Math.min(300, grand) : 0
-    const remainingAmount = grand - amountPaid
+    // ── Authorization: only order owner or admin can request refund ──
+    const isOwner = order.user && order.user.toString() === req.user._id.toString()
+    const isAdmin = req.user.role === 'admin'
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ message: 'Access denied' })
+    }
 
-    const order = await Order.create({
-      orderId,
-      user: user?._id || null,
-      guestEmail,
-      guestName: shipping?.name || guestInfo?.name || null,
-      guestPhone: shipping?.phone || guestInfo?.phone || null,
-      items: validatedItems.map(i => ({
-        product: i.product,
-        name: i.name,
-        size: i.size,
-        qty: i.qty,
-        price: i.price,
-        customization: i.artColors,
-      })),
-      shippingAddress: {
-        label: 'Delivery',
-        name: shipping?.name || guestInfo?.name || '',
-        phone: shipping?.phone || guestInfo?.phone || '',
-        street: shipping?.street || '',
-        city: shipping?.city || '',
-        zip: shipping?.zip || '',
-        country: shipping?.country || 'Bangladesh',
-      },
-      paymentMethod: 'cod',
-      paymentType: paymentType || 'full',
-      amountPaid: 0,
-      remainingAmount,
-      paymentStatus: 'pending',
-      orderStatus: 'processing',
-      subtotal,
-      shippingFee,
-      discount,
-      total: grand,
-      couponCode: couponCode || null,
-      note: note || '',
-      statusHistory: [{ status: 'processing', timestamp: new Date() }],
+    const result = await processRefund(order, {
+      reason,
+      context: 'customer',
+      uddoktapayRequest,
+      isConfigured: isUddoktaPayConfigured,
     })
 
-    // ── Atomic stock deduction with validation ──
-    const stockErrors = []
-    for (const item of validatedItems) {
-      if (item.product && item.size) {
-        const result = await Product.updateOne(
-          { _id: item.product, [`stock.${item.size}`]: { $gte: item.qty } },
-          { $inc: { [`stock.${item.size}`]: -item.qty } }
-        )
-        if (result.modifiedCount === 0) {
-          stockErrors.push(item.name)
-        }
-      }
-    }
-    if (stockErrors.length > 0) {
-      await Order.findByIdAndDelete(order._id)
-      return res.status(400).json({ message: `Insufficient stock for: ${stockErrors.join(', ')}` })
+    if (!result.ok) {
+      return res.status(400).json({ message: result.message })
     }
 
-    const receiptHtml = buildOrderReceiptEmail(order)
-    const recipientEmail = order.user?.email || order.guestEmail
-    if (recipientEmail) {
-      sendEmail(recipientEmail, `FleetMart Order Confirmation — #${order.orderId}`, receiptHtml)
-        .catch((err) => console.error(`[EMAIL] Receipt failed | Order: ${order.orderId} | Error: ${err.message}`))
-    }
-
-    res.status(201).json({ order, orderId: order.orderId })
+    res.json({ message: result.message, refundAmount: result.refundAmount, orderId: order.orderId })
   } catch (err) { next(err) }
 })
 

@@ -10,7 +10,7 @@ const CONTACTS = [
 const POLICIES = [
   { icon: <Package size={20} />, title: 'Delivery', text: 'Dhaka: 24–48 hours. Outside Dhaka: 2–4 days. Free delivery on orders over ৳3,000.' },
   { icon: <RotateCcw size={20} />, title: 'Returns', text: '7-day easy return on unworn items with original tags. Customized jerseys are non-returnable.' },
-  { icon: <CreditCard size={20} />, title: 'Payments', text: 'Cash on Delivery, bKash, Nagad, Visa/Mastercard via UddoktaPay. Partial payment (৳300) available for online orders.' },
+  { icon: <CreditCard size={20} />, title: 'Payments', text: 'bKash and Nagad via UddoktaPay. Partial payment (৳300) or full payment available.' },
   { icon: <Clock size={20} />, title: 'Business Hours', text: 'Online store: 24/7. Support team: 9am–11pm daily. Physical store: 10am–9pm.' },
 ]
 

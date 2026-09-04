@@ -21,7 +21,7 @@ export default function Footer() {
         <div className="container-fm grid grid-cols-2 gap-6 py-8 md:grid-cols-4">
           {[
             { icon: <Truck size={22} className="text-volt" />, title: 'Fast Delivery', sub: 'Dhaka 24h · Countrywide 72h' },
-            { icon: <ShieldCheck size={22} className="text-volt" />, title: 'Secure Payment', sub: 'bKash · Nagad · Card · COD' },
+            { icon: <ShieldCheck size={22} className="text-volt" />, title: 'Secure Payment', sub: 'bKash · Nagad via UddoktaPay' },
             { icon: <RefreshCcw size={22} className="text-volt" />, title: '7-Day Returns', sub: 'No questions asked' },
             { icon: <BadgeCheck size={22} className="text-volt" />, title: '100% Authentic', sub: 'Official quality kits' },
           ].map((t) => (
@@ -134,7 +134,6 @@ export default function Footer() {
             <span className="border border-line px-2 py-1">Nagad</span>
             <span className="border border-line px-2 py-1">Visa</span>
             <span className="border border-line px-2 py-1">Mastercard</span>
-            <span className="border border-line px-2 py-1">COD</span>
           </p>
         </div>
       </div>

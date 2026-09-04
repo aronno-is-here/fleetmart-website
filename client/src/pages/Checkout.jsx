@@ -8,6 +8,7 @@ import { fmt } from '../lib/format'
 import api from '../lib/api'
 
 const STEPS = ['Address', 'Shipping', 'Payment', 'Review']
+const PARTIAL_PAYMENT_AMOUNT = 300
 
 export default function Checkout() {
   const dispatch = useDispatch()
@@ -22,7 +23,7 @@ export default function Checkout() {
   const grand = passed.grand ?? total + shipping
 
   const [step, setStep] = useState(0)
-  const [method, setMethod] = useState('cod')
+  const [method, setMethod] = useState('uddoktapay')
   const [paymentType, setPaymentType] = useState('full')
   const [ship, setShip] = useState('standard')
   const [done, setDone] = useState(false)
@@ -59,7 +60,7 @@ export default function Checkout() {
 
   const shipFee = ship === 'express' ? 150 : shipping
   const finalTotal = grand - shipping + shipFee
-  const amountToPay = paymentType === 'partial' ? 300 : finalTotal
+  const amountToPay = paymentType === 'partial' ? PARTIAL_PAYMENT_AMOUNT : finalTotal
 
   const canNext = () => {
     if (step === 0) {
@@ -71,68 +72,37 @@ export default function Checkout() {
   const placeOrder = async () => {
     setPlacing(true)
     try {
-      if (method === 'cod') {
-        const { data } = await api.post('/payment/cod', {
-          items: items.map((i) => ({
-            product: i.id,
-            name: i.name,
-            size: i.size,
-            qty: i.qty,
-            price: i.price,
-            artColors: i.artColors,
-          })),
-          shipping: {
-            name: addr.name,
-            phone: addr.phone,
-            street: addr.street,
-            city: addr.city,
-            zip: addr.zip,
-            country: 'Bangladesh',
-          },
-          paymentType,
-          shippingMethod: ship,
-          couponCode: passed.couponCode || '',
-          totals: { subtotal: total, discount, shipping: shipFee, grand: finalTotal },
-          note: '',
-          guestInfo: !token ? { name: addr.name, email: addr.email, phone: addr.phone } : undefined,
-        })
-        setOrderId(data.order?.orderId || data.orderId || '')
-        dispatch(clearCart())
-        setDone(true)
-      } else {
-        const { data } = await api.post('/payment/initiate', {
-          items: items.map((i) => ({
-            product: i.id,
-            name: i.name,
-            size: i.size,
-            qty: i.qty,
-            price: i.price,
-            artColors: i.artColors,
-          })),
-          shipping: {
-            name: addr.name,
-            phone: addr.phone,
-            street: addr.street,
-            city: addr.city,
-            zip: addr.zip,
-            country: 'Bangladesh',
-          },
-          paymentMethod: method,
-          paymentType,
-          shippingMethod: ship,
-          couponCode: passed.couponCode || '',
-          totals: { subtotal: total, discount, shipping: shipFee, grand: finalTotal },
-          note: '',
-          guestInfo: !token ? { name: addr.name, email: addr.email, phone: addr.phone } : undefined,
-        })
+      const { data } = await api.post('/payment/initiate', {
+        items: items.map((i) => ({
+          product: i.id,
+          name: i.name,
+          size: i.size,
+          qty: i.qty,
+          price: i.price,
+          artColors: i.artColors,
+        })),
+        shipping: {
+          name: addr.name,
+          phone: addr.phone,
+          street: addr.street,
+          city: addr.city,
+          zip: addr.zip,
+          country: 'Bangladesh',
+        },
+        paymentType,
+        shippingMethod: ship,
+        couponCode: passed.couponCode || '',
+        totals: { subtotal: total, discount, shipping: shipFee, grand: finalTotal },
+        note: '',
+        guestInfo: !token ? { name: addr.name, email: addr.email, phone: addr.phone } : undefined,
+      })
 
-        if (data.gatewayUrl) {
-          window.location.href = data.gatewayUrl
-        } else if (data.attemptId) {
-          dispatch(toast({ type: 'info', message: data.message || 'Payment gateway unavailable. Try again.' }))
-        } else {
-          dispatch(toast({ type: 'error', message: 'Failed to initiate payment' }))
-        }
+      if (data.gatewayUrl) {
+        window.location.href = data.gatewayUrl
+      } else if (data.attemptId) {
+        dispatch(toast({ type: 'info', message: data.message || 'Payment gateway unavailable. Try again.' }))
+      } else {
+        dispatch(toast({ type: 'error', message: 'Failed to initiate payment' }))
       }
     } catch (err) {
       dispatch(toast({ type: 'error', message: err.response?.data?.message || 'Failed to place order' }))
@@ -150,8 +120,8 @@ export default function Checkout() {
           <p className="mt-3 text-muted">Order <span className="font-semibold text-volt">#{orderId || 'FM-PENDING'}</span> is confirmed. A tracking link is on its way to your inbox.</p>
           {paymentType === 'partial' && (
             <div className="mt-4 border border-line bg-pitch p-4 text-sm">
-              <p className="text-chalk">Amount paid: <span className="text-volt">{fmt(300)}</span></p>
-              <p className="text-muted">Remaining: {fmt(finalTotal - 300)} (to be paid on delivery)</p>
+              <p className="text-chalk">Amount paid: <span className="text-volt">{fmt(PARTIAL_PAYMENT_AMOUNT)}</span></p>
+              <p className="text-muted">Remaining: {fmt(finalTotal - PARTIAL_PAYMENT_AMOUNT)} (to be paid on delivery)</p>
             </div>
           )}
           <div className="mt-8 flex justify-center gap-3">
@@ -243,45 +213,25 @@ export default function Checkout() {
           {step === 2 && (
             <div className="space-y-6">
               <div className="space-y-3">
-                <p className="font-head text-sm font-semibold uppercase tracking-widest text-chalk">Payment Method</p>
+                <p className="font-head text-sm font-semibold uppercase tracking-widest text-chalk">Payment Type</p>
                 {[
-                  { id: 'cod', icon: <Wallet size={18} />, title: 'Cash on Delivery', sub: 'Pay when the gear arrives' },
-                  { id: 'uddoktapay', icon: <CreditCard size={18} />, title: 'Online Payment (bKash/Nagad/Card)', sub: 'Pay now via UddoktaPay' },
+                  { id: 'partial', title: `Partial Payment — ${fmt(PARTIAL_PAYMENT_AMOUNT)}`, sub: `Pay ${fmt(PARTIAL_PAYMENT_AMOUNT)} now via bKash/Nagad, rest on delivery`, amount: PARTIAL_PAYMENT_AMOUNT },
+                  { id: 'full', title: `Full Payment — ${fmt(finalTotal)}`, sub: 'Pay the full amount now via bKash/Nagad', amount: finalTotal },
                 ].map((o) => (
-                  <button key={o.id} onClick={() => setMethod(o.id)} className={`flex w-full items-center gap-4 border p-4 text-left transition-colors ${method === o.id ? 'border-volt bg-volt/5' : 'border-line hover:border-volt/50'}`}>
-                    <span className="text-volt">{o.icon}</span>
+                  <button key={o.id} onClick={() => setPaymentType(o.id)} className={`flex w-full items-center gap-4 border p-4 text-left transition-colors ${paymentType === o.id ? 'border-volt bg-volt/5' : 'border-line hover:border-volt/50'}`}>
+                    <span className="text-volt">{o.id === 'partial' ? <Wallet size={18} /> : <CreditCard size={18} />}</span>
                     <span className="flex-1">
                       <span className="block font-head text-sm font-semibold uppercase tracking-wide text-chalk">{o.title}</span>
                       <span className="text-xs text-muted">{o.sub}</span>
                     </span>
-                    <span className={`grid h-5 w-5 place-items-center rounded-full border ${method === o.id ? 'border-volt bg-volt' : 'border-line'}`}>
-                      {method === o.id && <Check size={12} className="text-night" />}
+                    <span className={`grid h-5 w-5 place-items-center rounded-full border ${paymentType === o.id ? 'border-volt bg-volt' : 'border-line'}`}>
+                      {paymentType === o.id && <Check size={12} className="text-night" />}
                     </span>
                   </button>
                 ))}
               </div>
 
-              {method !== 'cod' && (
-                <div className="space-y-3">
-                  <p className="font-head text-sm font-semibold uppercase tracking-widest text-chalk">Payment Type</p>
-                  {[
-                    { id: 'partial', title: 'Partial Payment — ৳300', sub: 'Pay ৳300 now, rest on delivery', amount: 300 },
-                    { id: 'full', title: `Full Payment — ${fmt(finalTotal)}`, sub: 'Pay the full amount now', amount: finalTotal },
-                  ].map((o) => (
-                    <button key={o.id} onClick={() => setPaymentType(o.id)} className={`flex w-full items-center gap-4 border p-4 text-left transition-colors ${paymentType === o.id ? 'border-volt bg-volt/5' : 'border-line hover:border-volt/50'}`}>
-                      <span className="flex-1">
-                        <span className="block font-head text-sm font-semibold uppercase tracking-wide text-chalk">{o.title}</span>
-                        <span className="text-xs text-muted">{o.sub}</span>
-                      </span>
-                      <span className={`grid h-5 w-5 place-items-center rounded-full border ${paymentType === o.id ? 'border-volt bg-volt' : 'border-line'}`}>
-                        {paymentType === o.id && <Check size={12} className="text-night" />}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <p className="text-xs text-muted">Payments are processed over encrypted connections. Fleetmart never stores card data.</p>
+              <p className="text-xs text-muted">Payments are processed securely via UddoktaPay. bKash and Nagad are available at checkout.</p>
             </div>
           )}
 
@@ -298,7 +248,7 @@ export default function Checkout() {
               </ul>
               <div className="grid gap-2 text-sm text-muted sm:grid-cols-2">
                 <p><span className="uppercase tracking-widest text-xs block text-muted">Ship to</span>{addr.name || '—'} · {addr.phone}<br />{addr.street}, {addr.city}</p>
-                <p><span className="uppercase tracking-widest text-xs block text-muted">Method</span>{ship === 'express' ? 'Express delivery' : 'Standard delivery'}<br />Paying via {method === 'cod' ? 'Cash on Delivery' : 'UddoktaPay'} ({paymentType === 'partial' ? 'Partial' : 'Full'})</p>
+                <p><span className="uppercase tracking-widest text-xs block text-muted">Method</span>{ship === 'express' ? 'Express delivery' : 'Standard delivery'}<br />Paying via UddoktaPay ({paymentType === 'partial' ? 'Partial' : 'Full'})</p>
               </div>
               {paymentType === 'partial' && (
                 <div className="border border-volt/30 bg-volt/5 p-4 text-sm">
@@ -317,7 +267,7 @@ export default function Checkout() {
               </button>
             ) : (
               <button onClick={placeOrder} disabled={placing} className="btn-volt !py-2.5 !text-xs">
-                {placing ? 'Processing…' : method === 'cod' ? `Place Order — ${fmt(finalTotal)}` : `Pay ${fmt(amountToPay)}`}
+                {placing ? 'Processing…' : `Pay ${fmt(amountToPay)}`}
               </button>
             )}
           </div>
@@ -333,10 +283,10 @@ export default function Checkout() {
               <dt className="font-head font-semibold uppercase tracking-widest text-chalk">Total</dt>
               <dd className="font-head text-xl font-semibold text-volt">{fmt(finalTotal)}</dd>
             </div>
-            {method !== 'cod' && paymentType === 'partial' && (
+            {paymentType === 'partial' && (
               <div className="flex justify-between border-t border-line pt-3">
                 <dt className="font-head text-xs uppercase tracking-widest text-muted">Pay Now</dt>
-                <dd className="font-head text-lg font-semibold text-volt">{fmt(300)}</dd>
+                <dd className="font-head text-lg font-semibold text-volt">{fmt(PARTIAL_PAYMENT_AMOUNT)}</dd>
               </div>
             )}
           </dl>

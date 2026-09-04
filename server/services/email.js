@@ -130,7 +130,7 @@ export const buildOrderReceiptEmail = (order) => {
         </tr>
         <tr>
           <td style="padding:4px 12px;color:#999;font-size:13px;">Payment Status</td>
-          <td style="padding:4px 12px;color:${order.paymentStatus === 'paid' ? '#22c55e' : order.paymentStatus === 'partial' ? '#f97316' : '#eab308'};font-size:13px;text-align:right;text-transform:uppercase;font-weight:600;">${order.paymentStatus}</td>
+          <td style="padding:4px 12px;color:${order.paymentStatus === 'paid' ? '#22c55e' : order.paymentStatus === 'partial' ? '#f97316' : order.paymentStatus === 'refunded' ? '#22c55e' : '#eab308'};font-size:13px;text-align:right;text-transform:uppercase;font-weight:600;">${order.paymentStatus}</td>
         </tr>
         <tr>
           <td style="padding:4px 12px;color:#999;font-size:13px;">Order Status</td>
