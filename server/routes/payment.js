@@ -257,6 +257,7 @@ router.post('/success', async (req, res, next) => {
     })
 
     // ── Atomic stock deduction ──
+    const stockIssues = []
     for (const item of attempt.items) {
       if (item.product && item.size) {
         const result = await Product.updateOne(
@@ -268,8 +269,17 @@ router.post('/success', async (req, res, next) => {
         })
         if (result.modifiedCount === 0) {
           console.warn(`[STOCK] Insufficient stock or not found | Product: ${item.product} | Size: ${item.size} | Qty: ${item.qty}`)
+          stockIssues.push(`${item.name} (${item.size})`)
         }
       }
+    }
+
+    // Flag order if stock deduction failed — admin must reconcile
+    if (stockIssues.length > 0) {
+      const stockNote = `STOCK ISSUE: Failed to deduct stock for: ${stockIssues.join(', ')}. Manual reconciliation required.`
+      order.note = order.note ? `${order.note}\n${stockNote}` : stockNote
+      order.statusHistory.push({ status: order.orderStatus, timestamp: new Date(), note: stockNote })
+      await order.save()
     }
 
     attempt.orderId = orderId
@@ -310,16 +320,38 @@ router.post('/ipn', async (req, res) => {
       return res.status(400).json({ message: 'Payment gateway not configured' })
     }
 
-    const apiKey = req.headers['rt-uddoktapay-api-key']
-    if (!apiKey || apiKey !== UDDOKTAPAY_API_KEY) {
+    // ── FIX 2: Timing-safe API key validation ──
+    const incomingKey = req.headers['rt-uddoktapay-api-key'] || ''
+    if (!incomingKey || incomingKey.length !== UDDOKTAPAY_API_KEY.length) {
+      return res.status(403).json({ message: 'Invalid API key' })
+    }
+    const keyBuffer = Buffer.from(incomingKey, 'utf8')
+    const expectedBuffer = Buffer.from(UDDOKTAPAY_API_KEY, 'utf8')
+    if (!crypto.timingSafeEqual(keyBuffer, expectedBuffer)) {
       return res.status(403).json({ message: 'Invalid API key' })
     }
 
-    const { invoice_id } = req.body
+    // ── FIX 3: Read full webhook payload ──
+    const {
+      invoice_id,
+      full_name,
+      email,
+      amount,
+      fee,
+      charged_amount,
+      payment_method,
+      sender_number,
+      transaction_id,
+      date,
+      status: webhookStatus,
+      metadata: webhookMetadata,
+    } = req.body
+
     if (!invoice_id) {
       return res.status(400).json({ message: 'Invalid request' })
     }
 
+    // ── Server-side verification remains authoritative ──
     const verification = await uddoktapayRequest('/api/verify-payment', { invoice_id })
 
     if (verification.status === 'COMPLETED') {
@@ -331,6 +363,9 @@ router.post('/ipn', async (req, res) => {
         if (attempt?.orderId) {
           return res.json({ message: 'Already processed' })
         }
+
+        // Log webhook data for audit trail (no sensitive data)
+        console.log(`[IPN] Verified payment | Invoice: ${invoice_id} | Amount: ${amount} | Method: ${payment_method} | Txn: ${transaction_id}`)
       }
     }
 
