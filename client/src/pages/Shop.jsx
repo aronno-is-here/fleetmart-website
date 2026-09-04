@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { SlidersHorizontal, X } from 'lucide-react'
-import { CATEGORIES, BRANDS, TEAMS, SIZES, BOOT_SIZES } from '../data/products'
+import { BRANDS, TEAMS, SIZES, BOOT_SIZES } from '../data/products'
+import { useFlatCategories } from '../hooks/useCategories'
 import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
 import PriceRange from '../components/PriceRange'
 import SEO from '../components/SEO'
@@ -49,6 +50,7 @@ export default function Shop() {
   const [products, setProducts] = useState([])
   const [total, setTotal] = useState(0)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const { categories: CATEGORIES } = useFlatCategories()
 
   const cat = params.get('category') || ''
   const brand = params.get('brand') || ''

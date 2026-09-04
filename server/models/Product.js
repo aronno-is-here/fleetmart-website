@@ -6,6 +6,7 @@ const productSchema = new mongoose.Schema({
   description: { type: String, default: '' },
   category: { type: String, required: true },
   subCategory: { type: String, default: '' },
+  categoryPath: { type: [String], default: [] },
   brand: { type: String, default: '' },
   team: { type: String, default: null },
   league: { type: String, default: null },

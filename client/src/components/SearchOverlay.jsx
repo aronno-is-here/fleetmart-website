@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { Search, X, ArrowRight } from 'lucide-react'
-import { CATEGORIES } from '../data/products'
+import { useFlatCategories } from '../hooks/useCategories'
 import { setSearchOpen } from '../features/uiSlice'
 import { fmt, discounted } from '../lib/format'
 import api from '../lib/api'
@@ -14,6 +14,7 @@ export default function SearchOverlay() {
   const [q, setQ] = useState('')
   const [results, setResults] = useState([])
   const inputRef = useRef(null)
+  const { categories: CATEGORIES } = useFlatCategories()
 
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 60)

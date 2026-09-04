@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import Product from '../models/Product.js'
+import Category from '../models/Category.js'
 import { protect, adminOnly } from '../middleware/auth.js'
 import { escapeRegex } from '../utils/sanitize.js'
 
@@ -8,13 +9,20 @@ const router = Router()
 // GET /api/products — public, with filters
 router.get('/', async (req, res, next) => {
   try {
-    const { category, brand, team, minPrice, maxPrice, size, sort, search, featured, page = 1, limit = 24 } = req.query
+    const { category, brand, team, minPrice, maxPrice, size, sort, search, featured, customizable, page = 1, limit = 24 } = req.query
     const filter = { isActive: true }
 
-    if (category) filter.category = category
+    if (category) {
+      // Match products whose categoryPath includes this category, or whose root category matches
+      filter.$or = [
+        { categoryPath: category },
+        { category: category },
+      ]
+    }
     if (brand) filter.brand = brand
     if (team) filter.team = team
     if (featured === '1') filter.featured = true
+    if (customizable === '1') filter.customizable = true
     if (size) filter[`stock.${size}`] = { $gt: 0 }
     if (minPrice || maxPrice) {
       filter.price = {}
@@ -60,8 +68,21 @@ router.get('/:slug', async (req, res, next) => {
 // POST /api/products — admin
 router.post('/', protect, adminOnly, async (req, res, next) => {
   try {
-    const { name, slug, description, category, subCategory, brand, team, league, price, discountPrice, stock, images, featured, isNew, customizable, artColors, isActive } = req.body
-    const product = await Product.create({ name, slug, description, category, subCategory, brand, team, league, price, discountPrice, stock, images, featured, isNew, customizable, artColors, isActive })
+    const { name, slug, description, category, subCategory, categoryPath, brand, team, league, price, discountPrice, stock, images, featured, isNew, customizable, artColors, isActive } = req.body
+
+    // Auto-build categoryPath if not provided
+    let resolvedPath = categoryPath || []
+    if (!resolvedPath.length && category) {
+      const cat = await Category.findOne({ id: category })
+      if (cat) resolvedPath = [cat.id]
+    }
+
+    const product = await Product.create({
+      name, slug, description, category, subCategory,
+      categoryPath: resolvedPath,
+      brand, team, league, price, discountPrice, stock, images,
+      featured, isNew, customizable, artColors, isActive,
+    })
     res.status(201).json({ product })
   } catch (err) { next(err) }
 })
@@ -69,8 +90,12 @@ router.post('/', protect, adminOnly, async (req, res, next) => {
 // PUT /api/products/:id — admin
 router.put('/:id', protect, adminOnly, async (req, res, next) => {
   try {
-    const { name, slug, description, category, subCategory, brand, team, league, price, discountPrice, stock, images, featured, isNew, customizable, artColors, isActive } = req.body
-    const product = await Product.findByIdAndUpdate(req.params.id, { name, slug, description, category, subCategory, brand, team, league, price, discountPrice, stock, images, featured, isNew, customizable, artColors, isActive }, { new: true, runValidators: true })
+    const { name, slug, description, category, subCategory, categoryPath, brand, team, league, price, discountPrice, stock, images, featured, isNew, customizable, artColors, isActive } = req.body
+
+    const update = { name, slug, description, category, subCategory, brand, team, league, price, discountPrice, stock, images, featured, isNew, customizable, artColors, isActive }
+    if (categoryPath !== undefined) update.categoryPath = categoryPath
+
+    const product = await Product.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true })
     if (!product) return res.status(404).json({ message: 'Product not found' })
     res.json({ product })
   } catch (err) { next(err) }

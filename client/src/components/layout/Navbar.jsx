@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
-import { Search, ShoppingBag, Heart, Menu, X, User, Zap, LogOut } from 'lucide-react'
-import { CATEGORIES } from '../../data/products'
+import { Search, ShoppingBag, Heart, Menu, X, User, Zap, LogOut, ChevronRight } from 'lucide-react'
 import { cartCount } from '../../features/cartSlice'
 import { setCartOpen, setSearchOpen, setMobileNavOpen, toast } from '../../features/uiSlice'
 import { logout } from '../../features/authSlice'
+import { useCategories } from '../../hooks/useCategories'
 
 import Ticker from './Ticker'
 import api from '../../lib/api'
@@ -38,8 +38,10 @@ export default function Navbar() {
   const [megaOpen, setMegaOpen] = useState(false)
   const [catCounts, setCatCounts] = useState({})
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [expandedMobile, setExpandedMobile] = useState({})
   const location = useLocation()
   const navigate = useNavigate()
+  const { categories: allCategories } = useCategories()
 
   const handleLogout = async () => {
     try { await api.post('/auth/logout') } catch {}
@@ -64,18 +66,20 @@ export default function Navbar() {
     if (!megaOpen) return
     api.get('/products', { params: { limit: 200 } }).then(({ data }) => {
       const counts = {}
-      CATEGORIES.forEach(c => { counts[c.id] = 0 })
+      allCategories.forEach(c => { counts[c.id] = 0 })
       data.products.forEach(p => {
         if (counts[p.category] !== undefined) counts[p.category]++
       })
       setCatCounts(counts)
     }).catch(() => {})
-  }, [megaOpen])
+  }, [megaOpen, allCategories])
 
   const linkCls = ({ isActive }) =>
     `font-head text-sm font-medium uppercase tracking-[0.18em] transition-colors ${
       isActive ? 'text-volt' : 'text-chalk/85 hover:text-volt'
     }`
+
+  const rootCats = allCategories.filter(c => !c.parent || c.level === 0)
 
   return (
     <header className="sticky top-0 z-50">
@@ -160,11 +164,11 @@ export default function Navbar() {
               <Link to="/shop" className="font-head text-xs font-semibold uppercase tracking-widest text-volt hover:underline">Open Catalog →</Link>
             </div>
             <div className="grid grid-cols-4 gap-3">
-              {CATEGORIES.map((c) => (
+              {rootCats.map((c) => (
                 <Link key={c.id} to={`/shop?category=${c.id}`} className="group flex items-center justify-between border border-line bg-pitch px-5 py-4 transition-colors hover:border-volt/50 hover:bg-pitch2">
                   <div>
                     <p className="font-display text-2xl uppercase tracking-wide text-chalk group-hover:text-volt">{c.name}</p>
-                    <p className="text-[11px] uppercase tracking-widest text-muted">{c.blurb}</p>
+                    <p className="text-[11px] uppercase tracking-widest text-muted">{c.blurb || ''}</p>
                   </div>
                   <span className="flex items-center gap-2 font-head text-xs uppercase tracking-widest text-muted group-hover:text-volt">
                     {catCounts[c.id] || 0} items <span className="transition-transform duration-200 group-hover:translate-x-1">→</span>
@@ -185,11 +189,31 @@ export default function Navbar() {
 
       {/* Mobile drawer */}
       <div className={`fixed inset-0 top-[97px] z-40 bg-night/95 backdrop-blur transition-transform duration-250 lg:hidden ${mobileOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <nav className="container-fm flex flex-col gap-1 py-6">
-          {CATEGORIES.map((c) => (
-            <Link key={c.id} to={`/shop?category=${c.id}`} className="flex items-center justify-between border-b border-line py-4 font-display text-2xl uppercase tracking-wide text-chalk">
-              {c.name} <span className="text-volt">→</span>
-            </Link>
+        <nav className="container-fm flex flex-col gap-1 py-6 overflow-y-auto max-h-[calc(100vh-97px)]">
+          {rootCats.map((c) => (
+            <div key={c.id}>
+              <div className="flex items-center justify-between border-b border-line py-4">
+                <Link to={`/shop?category=${c.id}`}
+                  onClick={() => dispatch(setMobileNavOpen(false))}
+                  className="font-display text-2xl uppercase tracking-wide text-chalk flex-1">
+                  {c.name}
+                </Link>
+                {c.children?.length > 0 && (
+                  <button onClick={() => setExpandedMobile(prev => ({ ...prev, [c._id]: !prev[c._id] }))}
+                    className="text-volt p-2">
+                    <ChevronRight size={18} className={`transition-transform ${expandedMobile[c._id] ? 'rotate-90' : ''}`} />
+                  </button>
+                )}
+              </div>
+              {expandedMobile[c._id] && c.children?.map(sub => (
+                <Link key={sub.id} to={`/shop?category=${sub.id}`}
+                  onClick={() => dispatch(setMobileNavOpen(false))}
+                  className="flex items-center justify-between border-b border-line/50 py-3 pl-4 font-display text-lg uppercase tracking-wide text-muted">
+                  {sub.name}
+                  {sub.children?.length > 0 && <span className="text-xs">{sub.children.length} items</span>}
+                </Link>
+              ))}
+            </div>
           ))}
           <div className="mt-4 flex gap-3">
             {user ? (

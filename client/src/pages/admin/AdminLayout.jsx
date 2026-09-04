@@ -3,7 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Tag,
-  LogOut, Menu, X, Star, Settings, BarChart3,
+  LogOut, Menu, X, Star, Settings, BarChart3, FolderTree, Image,
 } from 'lucide-react'
 import { logout } from '../../features/authSlice'
 import api from '../../lib/api'
@@ -11,6 +11,8 @@ import api from '../../lib/api'
 const NAV = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/products', label: 'Products', icon: Package },
+  { to: '/admin/categories', label: 'Categories', icon: FolderTree },
+  { to: '/admin/banners', label: 'Hero Banners', icon: Image },
   { to: '/admin/orders', label: 'Orders', icon: ShoppingCart },
   { to: '/admin/users', label: 'Users', icon: Users },
   { to: '/admin/coupons', label: 'Coupons', icon: Tag },

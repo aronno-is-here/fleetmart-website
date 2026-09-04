@@ -24,6 +24,7 @@ import adminRoutes from './routes/admin.js'
 import analyticsRoutes from './routes/analytics.js'
 import uploadRoutes from './routes/upload.js'
 import paymentRoutes from './routes/payment.js'
+import bannerRoutes from './routes/banners.js'
 import ensureDemoProduct from './startup/ensureDemoProduct.js'
 
 // Validate required env vars
@@ -121,6 +122,7 @@ app.use('/api/admin', adminRoutes)
 app.use('/api/admin', analyticsRoutes)
 app.use('/api/upload', uploadRoutes)
 app.use('/api/payment', paymentRoutes)
+app.use('/api/banners', bannerRoutes)
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
 

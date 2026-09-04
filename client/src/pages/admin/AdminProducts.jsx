@@ -5,15 +5,89 @@ import api from '../../lib/api'
 const fmt = (n) => `৳${Number(n).toLocaleString()}`
 
 const empty = {
-  name: '', slug: '', description: '', category: 'jersey', subCategory: '', brand: '',
+  name: '', slug: '', description: '', category: '', subCategory: '', brand: '',
   team: '', league: '', price: '', discountPrice: '', stock: '{}',
   featured: false, isNew: false, customizable: false,
   artColors: { primary: '#C6F53F', secondary: '#0A0E13', accent: '#3FA9F5' },
-  images: [],
+  images: [], categoryPath: [],
+}
+
+function CategoryPicker({ value, onChange, categories }) {
+  const [selected, setSelected] = useState(value ? [value] : [])
+
+  useEffect(() => {
+    if (value) setSelected([value])
+    else setSelected([])
+  }, [value])
+
+  const rootCats = categories.filter(c => !c.parent)
+  const childrenMap = {}
+  categories.forEach(c => {
+    if (c.parent) {
+      if (!childrenMap[c.parent]) childrenMap[c.parent] = []
+      childrenMap[c.parent].push(c)
+    }
+  })
+
+  const findPath = (catId, cats) => {
+    const cat = cats.find(c => c._id === catId)
+    if (!cat) return [catId]
+    if (!cat.parent) return [cat.id]
+    return [...findPath(cat.parent, cats), cat.id]
+  }
+
+  const handleChange = (level, catId) => {
+    const newPath = catId ? findPath(catId, categories) : []
+    const leafCat = catId ? categories.find(c => c._id === catId) : null
+    onChange(leafCat ? leafCat.id : '', newPath)
+    setSelected(prev => {
+      const next = [...prev]
+      next[level] = catId
+      next.length = level + 1
+      return next
+    })
+  }
+
+  const levels = [[]]
+  const firstLevel = selected[0]
+  if (firstLevel && childrenMap[firstLevel]) {
+    levels.push(childrenMap[firstLevel])
+  }
+  if (selected[1] && childrenMap[selected[1]]) {
+    levels.push(childrenMap[selected[1]])
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <select value={selected[0] || ''} onChange={e => handleChange(0, e.target.value)} className="input-fm">
+        <option value="">Root category</option>
+        {rootCats.map(c => (
+          <option key={c._id} value={c._id}>{c.name} ({c.id})</option>
+        ))}
+      </select>
+      {levels[1] && levels[1].length > 0 && (
+        <select value={selected[1] || ''} onChange={e => handleChange(1, e.target.value)} className="input-fm">
+          <option value="">Select subcategory</option>
+          {levels[1].map(c => (
+            <option key={c._id} value={c._id}>{c.name} ({c.id})</option>
+          ))}
+        </select>
+      )}
+      {levels[2] && levels[2].length > 0 && (
+        <select value={selected[2] || ''} onChange={e => handleChange(2, e.target.value)} className="input-fm">
+          <option value="">Select sub-subcategory</option>
+          {levels[2].map(c => (
+            <option key={c._id} value={c._id}>{c.name} ({c.id})</option>
+          ))}
+        </select>
+      )}
+    </div>
+  )
 }
 
 export default function AdminProducts() {
   const [products, setProducts] = useState([])
+  const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [pages, setPages] = useState(1)
@@ -24,6 +98,13 @@ export default function AdminProducts() {
   const [filter, setFilter] = useState('')
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef(null)
+
+  const loadCategories = async () => {
+    try {
+      const { data } = await api.get('/categories/all')
+      setCategories(data.categories)
+    } catch {}
+  }
 
   const load = (p = 1) => {
     setLoading(true)
@@ -39,6 +120,7 @@ export default function AdminProducts() {
   }
 
   useEffect(() => { load() }, [filter])
+  useEffect(() => { loadCategories() }, [])
 
   const openNew = () => { setEditing('new'); setForm(empty) }
   const openEdit = (p) => {
@@ -49,6 +131,7 @@ export default function AdminProducts() {
       discountPrice: p.discountPrice ? String(p.discountPrice) : '',
       stock: JSON.stringify(Object.fromEntries(Object.entries(p.stock || {}))),
       images: p.images || [],
+      categoryPath: p.categoryPath || [],
     })
   }
 
@@ -71,6 +154,10 @@ export default function AdminProducts() {
 
   const removeImage = (idx) => {
     setForm(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }))
+  }
+
+  const handleCategoryChange = (catId, path) => {
+    setForm(prev => ({ ...prev, category: catId, categoryPath: path }))
   }
 
   const save = async (e) => {
@@ -102,6 +189,8 @@ export default function AdminProducts() {
     load(page)
   }
 
+  const flatCats = categories
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -116,14 +205,9 @@ export default function AdminProducts() {
 
       <select value={filter} onChange={e => setFilter(e.target.value)} className="input-fm max-w-xs">
         <option value="">All Categories</option>
-        <option value="jersey">Jerseys</option>
-        <option value="boots">Boots</option>
-        <option value="football">Footballs</option>
-        <option value="training">Training</option>
-        <option value="goalkeeper">Goalkeeping</option>
-        <option value="turf">Turf & Grass</option>
-        <option value="accessories">Accessories</option>
-        <option value="merch">Fan Merch</option>
+        {flatCats.map(c => (
+          <option key={c._id} value={c.id}>{c.name} ({c.id})</option>
+        ))}
       </select>
 
       <div className="bg-pitch border border-line overflow-x-auto">
@@ -195,7 +279,6 @@ export default function AdminProducts() {
               <button onClick={() => setEditing(null)} className="text-muted hover:text-chalk"><X size={20} /></button>
             </div>
             <form onSubmit={save} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-              {/* Images Section */}
               <div>
                 <label className="block text-xs font-head text-muted uppercase tracking-widest mb-2">Product Images</label>
                 <div className="flex flex-wrap gap-3">
@@ -227,14 +310,6 @@ export default function AdminProducts() {
                   <input value={form.slug} onChange={e => setForm({ ...form, slug: e.target.value })} required className="input-fm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1">Category</label>
-                  <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="input-fm">
-                    {['jersey','boots','football','training','goalkeeper','turf','accessories','merch'].map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
                   <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1">Brand</label>
                   <input value={form.brand} onChange={e => setForm({ ...form, brand: e.target.value })} className="input-fm" />
                 </div>
@@ -250,6 +325,11 @@ export default function AdminProducts() {
                   <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1">Discount Price</label>
                   <input type="number" value={form.discountPrice} onChange={e => setForm({ ...form, discountPrice: e.target.value })} className="input-fm" />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1">Category (cascading)</label>
+                <CategoryPicker value={form.category} onChange={handleCategoryChange} categories={flatCats} />
               </div>
 
               <div>

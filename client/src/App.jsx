@@ -30,6 +30,8 @@ const AdminCoupons = lazy(() => import('./pages/admin/AdminCoupons'))
 const AdminReviews = lazy(() => import('./pages/admin/AdminReviews'))
 const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics'))
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'))
+const AdminCategories = lazy(() => import('./pages/admin/AdminCategories'))
+const AdminBanners = lazy(() => import('./pages/admin/AdminBanners'))
 
 function Loading() {
   return (
@@ -97,6 +99,8 @@ const router = createBrowserRouter([
       { path: 'coupons', element: withSuspense(AdminCoupons) },
       { path: 'reviews', element: withSuspense(AdminReviews) },
       { path: 'analytics', element: withSuspense(AdminAnalytics) },
+      { path: 'categories', element: withSuspense(AdminCategories) },
+      { path: 'banners', element: withSuspense(AdminBanners) },
       { path: 'settings', element: withSuspense(AdminSettings) },
     ],
   },

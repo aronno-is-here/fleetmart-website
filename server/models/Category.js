@@ -5,7 +5,16 @@ const categorySchema = new mongoose.Schema({
   name: { type: String, required: true },
   blurb: { type: String, default: '' },
   image: { type: String, default: '' },
+  parent: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null },
+  path: { type: String, default: '/' },
+  level: { type: Number, default: 0 },
+  displayOrder: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true },
 }, { timestamps: true })
+
+categorySchema.index({ parent: 1 })
+categorySchema.index({ path: 1 })
+categorySchema.index({ level: 1 })
+categorySchema.index({ displayOrder: 1 })
 
 export default mongoose.model('Category', categorySchema)
