@@ -13,6 +13,8 @@
     "install:all": "npm install && cd client && npm install"
   },
   "dependencies": {
+    "apple-signin-auth": "^2.1.0",
+    "axios": "^1.20.0",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.5.1",
     "compression": "^1.8.1",
@@ -23,6 +25,7 @@
     "express-mongo-sanitize": "^2.2.0",
     "express-rate-limit": "^8.7.0",
     "express-validator": "^7.3.2",
+    "google-auth-library": "^11.0.2",
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.9.5",
