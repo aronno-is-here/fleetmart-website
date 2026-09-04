@@ -1,9 +1,10 @@
 import { Router } from 'express'
 import Order from '../models/Order.js'
 import Product from '../models/Product.js'
+import Coupon from '../models/Coupon.js'
 import { protect, adminOnly } from '../middleware/auth.js'
 import { sendEmail } from '../services/email.js'
-import { escapeRegex } from '../utils/sanitize.js'
+import { escapeRegex, escapeHtml } from '../utils/sanitize.js'
 
 const router = Router()
 
@@ -15,11 +16,11 @@ router.get('/my', protect, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// GET /api/orders/lookup/:orderId — public order lookup (by orderId + email for guest)
+// GET /api/orders/lookup/:orderId — public order lookup (limited fields for privacy)
 router.get('/lookup/:orderId', async (req, res, next) => {
   try {
     const order = await Order.findOne({ orderId: req.params.orderId })
-      .populate('user', 'name email')
+      .select('orderId orderStatus paymentStatus paymentMethod total createdAt')
     if (!order) return res.status(404).json({ message: 'Order not found' })
     res.json({ order })
   } catch (err) { next(err) }
@@ -77,6 +78,8 @@ router.put('/:id/status', protect, adminOnly, async (req, res, next) => {
     const recipientEmail = order.user?.email || order.guestEmail
     if (recipientEmail) {
       const customerName = order.user?.name || order.guestName || 'Customer'
+      const safeName = escapeHtml(customerName)
+      const safeNote = note ? escapeHtml(note) : ''
       const statusLabels = {
         confirmed: 'Your order has been confirmed',
         shipped: 'Your order has been shipped',
@@ -86,7 +89,7 @@ router.put('/:id/status', protect, adminOnly, async (req, res, next) => {
         returned: 'Your order has been returned',
       }
       const subject = `FleetMart — Order #${order.orderId} ${statusLabels[status] ? '— ' + statusLabels[status] : ''}`
-      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#0a0a0a;font-family:'Segoe UI',system-ui,sans-serif;"><div style="max-width:600px;margin:0 auto;padding:32px 20px;"><div style="text-align:center;margin-bottom:24px;"><div style="display:inline-block;background:#ccff00;color:#0a0a0a;font-size:18px;font-weight:900;letter-spacing:3px;padding:6px 14px;">FLEETMART</div></div><div style="background:#111;border:1px solid #222;padding:32px;text-align:center;"><h1 style="margin:0 0 12px;color:#fff;font-size:20px;text-transform:uppercase;letter-spacing:2px;">Order Update</h1><p style="margin:0 0 8px;color:#999;font-size:14px;">Hi ${customerName},</p><p style="margin:0 0 16px;color:#ccc;font-size:16px;">${statusLabels[status] || `Your order status has been updated to ${status}`}</p><p style="margin:0;color:#ccff00;font-size:14px;font-weight:700;">#${order.orderId}</p>${note ? `<p style="margin:12px 0 0;color:#999;font-size:13px;">Note: ${note}</p>` : ''}</div><div style="text-align:center;padding:20px 0;"><p style="margin:0;color:#666;font-size:11px;">© ${new Date().getFullYear()} FleetMart</p></div></div></body></html>`
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#0a0a0a;font-family:'Segoe UI',system-ui,sans-serif;"><div style="max-width:600px;margin:0 auto;padding:32px 20px;"><div style="text-align:center;margin-bottom:24px;"><div style="display:inline-block;background:#ccff00;color:#0a0a0a;font-size:18px;font-weight:900;letter-spacing:3px;padding:6px 14px;">FLEETMART</div></div><div style="background:#111;border:1px solid #222;padding:32px;text-align:center;"><h1 style="margin:0 0 12px;color:#fff;font-size:20px;text-transform:uppercase;letter-spacing:2px;">Order Update</h1><p style="margin:0 0 8px;color:#999;font-size:14px;">Hi ${safeName},</p><p style="margin:0 0 16px;color:#ccc;font-size:16px;">${statusLabels[status] || `Your order status has been updated to ${escapeHtml(status)}`}</p><p style="margin:0;color:#ccff00;font-size:14px;font-weight:700;">#${order.orderId}</p>${safeNote ? `<p style="margin:12px 0 0;color:#999;font-size:13px;">Note: ${safeNote}</p>` : ''}</div><div style="text-align:center;padding:20px 0;"><p style="margin:0;color:#666;font-size:11px;">© ${new Date().getFullYear()} FleetMart</p></div></div></body></html>`
       sendEmail(recipientEmail, subject, html)
         .catch((err) => console.error(`[EMAIL] Status notification failed | Order: ${order.orderId} | Status: ${status} | Error: ${err.message}`))
     }
@@ -143,10 +146,13 @@ router.post('/', protect, async (req, res, next) => {
 
     for (const item of items) {
       if (item.product && item.size) {
-        await Product.updateOne(
+        const result = await Product.updateOne(
           { _id: item.product, [`stock.${item.size}`]: { $gte: item.qty } },
           { $inc: { [`stock.${item.size}`]: -item.qty } }
-        ).catch(() => {})
+        )
+        if (result.modifiedCount === 0) {
+          console.warn(`[STOCK] Insufficient stock for ${item.name} (${item.size})`)
+        }
       }
     }
 

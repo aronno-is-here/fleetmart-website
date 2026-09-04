@@ -7,14 +7,15 @@ import { protect, adminOnly } from '../middleware/auth.js'
 const router = Router()
 
 const generateReviewerName = async () => {
-  let name
-  let exists = true
-  while (exists) {
+  const MAX_RETRIES = 5
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const num = Math.floor(1000000 + Math.random() * 9000000)
-    name = `User_${num}`
-    exists = await Review.findOne({ reviewerName: name })
+    const name = `User_${num}`
+    const exists = await Review.findOne({ reviewerName: name })
+    if (!exists) return name
   }
-  return name
+  // Fallback: use timestamp suffix to guarantee uniqueness
+  return `User_${Date.now().toString(36).toUpperCase()}`
 }
 
 // GET /api/reviews/product/:productId — public, visible reviews (paginated)

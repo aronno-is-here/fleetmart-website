@@ -13,5 +13,6 @@ const reviewSchema = new mongoose.Schema({
 
 reviewSchema.index({ product: 1, user: 1, order: 1 }, { unique: true })
 reviewSchema.index({ product: 1, isVisible: 1, createdAt: -1 })
+reviewSchema.index({ reviewerName: 1 }, { unique: true })
 
 export default mongoose.model('Review', reviewSchema)

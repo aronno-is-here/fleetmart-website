@@ -4,7 +4,7 @@ import SSLCommerzPayment from 'sslcommerz-lts'
 import Order from '../models/Order.js'
 import PaymentAttempt from '../models/PaymentAttempt.js'
 import Product from '../models/Product.js'
-import { protect, adminOnly } from '../middleware/auth.js'
+import { protect, optionalAuth, adminOnly } from '../middleware/auth.js'
 import { sendEmail, buildOrderReceiptEmail } from '../services/email.js'
 
 const router = Router()
@@ -24,9 +24,9 @@ const generateOrderId = () => `FM-${Date.now().toString(36).toUpperCase()}-${cry
 const generateAttemptId = () => `PA-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`
 
 // POST /api/payment/initiate — create payment attempt + redirect to gateway
-router.post('/initiate', async (req, res, next) => {
+router.post('/initiate', optionalAuth, async (req, res, next) => {
   try {
-    const { items, shipping, paymentMethod, paymentType, shippingMethod, couponCode, totals, note, guestInfo } = req.body
+    const { items, shipping, paymentMethod, paymentType, shippingMethod, couponCode, note, guestInfo } = req.body
 
     if (!items || items.length === 0) {
       return res.status(400).json({ message: 'Order must contain at least one item' })
@@ -41,14 +41,39 @@ router.post('/initiate', async (req, res, next) => {
       return res.status(400).json({ message: 'Email is required for guest checkout' })
     }
 
-    const amountToPay = paymentType === 'partial' ? 300 : (totals?.grand || 0)
+    // ── Server-side amount recalculation (never trust client totals) ──
+    const productIds = items.map(i => i.product)
+    const dbProducts = await Product.find({ _id: { $in: productIds } })
+    const productMap = Object.fromEntries(dbProducts.map(p => [p._id.toString(), p]))
+
+    let subtotal = 0
+    const validatedItems = items.map(i => {
+      const dbProduct = productMap[i.product]
+      const price = dbProduct ? dbProduct.price : i.price
+      const qty = Math.max(1, Math.floor(Number(i.qty) || 1))
+      subtotal += price * qty
+      return { ...i, price, qty }
+    })
+
+    const shippingFee = subtotal >= 3000 ? 0 : 80
+    let discount = 0
+    if (couponCode) {
+      const Coupon = (await import('../models/Coupon.js')).default
+      const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true })
+      if (coupon && (!coupon.expiresAt || coupon.expiresAt > new Date()) && (coupon.maxUses <= 0 || coupon.usedCount < coupon.maxUses) && subtotal >= coupon.minOrder) {
+        discount = coupon.discountType === 'percent' ? Math.round(subtotal * coupon.value / 100) : Math.min(coupon.value, subtotal)
+        await Coupon.updateOne({ _id: coupon._id }, { $inc: { usedCount: 1 } })
+      }
+    }
+    const grand = Math.max(0, subtotal + shippingFee - discount)
+    const amountToPay = paymentType === 'partial' ? Math.min(300, grand) : grand
     const attemptId = generateAttemptId()
 
     const attempt = await PaymentAttempt.create({
       attemptId,
       user: user?._id || null,
       guestEmail,
-      items: items.map(i => ({
+      items: validatedItems.map(i => ({
         product: i.product,
         name: i.name,
         size: i.size,
@@ -67,10 +92,10 @@ router.post('/initiate', async (req, res, next) => {
       },
       paymentMethod: paymentMethod || 'sslcommerz',
       paymentType: paymentType || 'full',
-      subtotal: totals?.subtotal || 0,
-      shippingFee: totals?.shipping || 0,
-      discount: totals?.discount || 0,
-      total: totals?.grand || 0,
+      subtotal,
+      shippingFee,
+      discount,
+      total: grand,
       amountToPay,
       couponCode: couponCode || null,
       note: note || '',
@@ -97,7 +122,7 @@ router.post('/initiate', async (req, res, next) => {
       cancel_url: `${req.headers.origin || 'https://fleetmartbd.vercel.app'}/api/payment/cancel`,
       ipn_url: `${req.headers.origin || 'https://fleetmartbd.vercel.app'}/api/payment/ipn`,
       shipping_method: 'Courier',
-      product_name: items.map(i => i.name).join(', '),
+      product_name: validatedItems.map(i => i.name).join(', '),
       product_category: 'E-Commerce',
       product_profile: 'general',
       cus_name: shipping?.name || guestName || user?.name || 'Customer',
@@ -270,11 +295,19 @@ router.post('/ipn', async (req, res) => {
   }
 })
 
-// GET /api/payment/status/:attemptId — check payment status
-router.get('/status/:attemptId', async (req, res, next) => {
+// GET /api/payment/status/:attemptId — check payment status (owner or admin only)
+router.get('/status/:attemptId', optionalAuth, async (req, res, next) => {
   try {
     const attempt = await PaymentAttempt.findOne({ attemptId: req.params.attemptId })
     if (!attempt) return res.status(404).json({ message: 'Payment attempt not found' })
+
+    // Access control: owner, admin, or guest with matching email
+    const isOwner = req.user && attempt.user?.toString() === req.user._id.toString()
+    const isAdmin = req.user?.role === 'admin'
+    const isGuest = !req.user && attempt.guestEmail && req.query.email === attempt.guestEmail
+    if (!isOwner && !isAdmin && !isGuest) {
+      return res.status(403).json({ message: 'Access denied' })
+    }
 
     res.json({
       status: attempt.status,
@@ -286,10 +319,10 @@ router.get('/status/:attemptId', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// GET /api/payment/cod — create order for COD (no gateway)
-router.post('/cod', async (req, res, next) => {
+// POST /api/payment/cod — create order for COD (no gateway)
+router.post('/cod', optionalAuth, async (req, res, next) => {
   try {
-    const { items, shipping, paymentType, shippingMethod, couponCode, totals, note, guestInfo } = req.body
+    const { items, shipping, paymentType, shippingMethod, couponCode, note, guestInfo } = req.body
 
     if (!items || items.length === 0) {
       return res.status(400).json({ message: 'Order must contain at least one item' })
@@ -302,9 +335,34 @@ router.post('/cod', async (req, res, next) => {
       return res.status(400).json({ message: 'Email is required for guest checkout' })
     }
 
+    // ── Server-side amount recalculation ──
+    const productIds = items.map(i => i.product)
+    const dbProducts = await Product.find({ _id: { $in: productIds } })
+    const productMap = Object.fromEntries(dbProducts.map(p => [p._id.toString(), p]))
+
+    let subtotal = 0
+    const validatedItems = items.map(i => {
+      const dbProduct = productMap[i.product]
+      const price = dbProduct ? dbProduct.price : i.price
+      const qty = Math.max(1, Math.floor(Number(i.qty) || 1))
+      subtotal += price * qty
+      return { ...i, price, qty }
+    })
+
+    const shippingFee = subtotal >= 3000 ? 0 : 80
+    let discount = 0
+    if (couponCode) {
+      const Coupon = (await import('../models/Coupon.js')).default
+      const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true })
+      if (coupon && (!coupon.expiresAt || coupon.expiresAt > new Date()) && (coupon.maxUses <= 0 || coupon.usedCount < coupon.maxUses) && subtotal >= coupon.minOrder) {
+        discount = coupon.discountType === 'percent' ? Math.round(subtotal * coupon.value / 100) : Math.min(coupon.value, subtotal)
+        await Coupon.updateOne({ _id: coupon._id }, { $inc: { usedCount: 1 } })
+      }
+    }
+    const grand = Math.max(0, subtotal + shippingFee - discount)
     const orderId = generateOrderId()
-    const amountPaid = paymentType === 'partial' ? 300 : 0
-    const remainingAmount = paymentType === 'partial' ? (totals?.grand || 0) - 300 : (totals?.grand || 0)
+    const amountPaid = paymentType === 'partial' ? Math.min(300, grand) : 0
+    const remainingAmount = grand - amountPaid
 
     const order = await Order.create({
       orderId,
@@ -312,7 +370,7 @@ router.post('/cod', async (req, res, next) => {
       guestEmail,
       guestName: shipping?.name || guestInfo?.name || null,
       guestPhone: shipping?.phone || guestInfo?.phone || null,
-      items: items.map(i => ({
+      items: validatedItems.map(i => ({
         product: i.product,
         name: i.name,
         size: i.size,
@@ -335,22 +393,31 @@ router.post('/cod', async (req, res, next) => {
       remainingAmount,
       paymentStatus: 'pending',
       orderStatus: 'processing',
-      subtotal: totals?.subtotal || 0,
-      shippingFee: totals?.shipping || 0,
-      discount: totals?.discount || 0,
-      total: totals?.grand || 0,
+      subtotal,
+      shippingFee,
+      discount,
+      total: grand,
       couponCode: couponCode || null,
       note: note || '',
       statusHistory: [{ status: 'processing', timestamp: new Date() }],
     })
 
-    for (const item of items) {
+    // ── Atomic stock deduction with validation ──
+    const stockErrors = []
+    for (const item of validatedItems) {
       if (item.product && item.size) {
-        await Product.updateOne(
+        const result = await Product.updateOne(
           { _id: item.product, [`stock.${item.size}`]: { $gte: item.qty } },
           { $inc: { [`stock.${item.size}`]: -item.qty } }
-        ).catch(() => {})
+        )
+        if (result.modifiedCount === 0) {
+          stockErrors.push(item.name)
+        }
       }
+    }
+    if (stockErrors.length > 0) {
+      await Order.findByIdAndDelete(order._id)
+      return res.status(400).json({ message: `Insufficient stock for: ${stockErrors.join(', ')}` })
     }
 
     const receiptHtml = buildOrderReceiptEmail(order)

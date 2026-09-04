@@ -19,12 +19,7 @@ export default function AdminLogin() {
     setError('')
     setLoading(true)
     try {
-      const { data } = await api.post('/auth/login', { email, password })
-      if (data.user.role !== 'admin') {
-        setError('Not an admin account')
-        setLoading(false)
-        return
-      }
+      const { data } = await api.post('/auth/admin-login', { email, password })
       dispatch(setCredentials({ token: data.token, user: data.user }))
       navigate('/admin')
     } catch (err) {

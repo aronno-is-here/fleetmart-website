@@ -7,6 +7,12 @@ import Product from './models/Product.js'
 import Category from './models/Category.js'
 import Coupon from './models/Coupon.js'
 
+// Prevent seeding in production
+if (process.env.NODE_ENV === 'production') {
+  console.error('Refusing to seed in production environment. Set NODE_ENV=development to seed.')
+  process.exit(1)
+}
+
 const CATEGORIES = [
   { id: 'jersey', name: 'Jerseys', blurb: 'Club · National · Retro' },
   { id: 'boots', name: 'Boots', blurb: 'FG · Turf · Indoor' },
@@ -68,23 +74,27 @@ async function seed() {
     ])
 
     // Create admin user
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@fleetmart.com'
+    const adminPassword = process.env.ADMIN_PASSWORD || 'Fleet@Admin2026'
     const admin = await User.create({
       name: 'Admin',
-      email: 'admin@fleetmart.com',
-      password: 'Fleet@Admin2026',
+      email: adminEmail,
+      password: adminPassword,
       role: 'admin',
       phone: '+8801700000000',
     })
     console.log(`Admin user created: ${admin.email}`)
 
     // Create demo customer
+    const demoEmail = process.env.DEMO_EMAIL || 'demo@fleetmart.com'
+    const demoPassword = process.env.DEMO_PASSWORD || 'demo123'
     await User.create({
       name: 'Demo Customer',
-      email: 'demo@fleetmart.com',
-      password: 'demo123',
+      email: demoEmail,
+      password: demoPassword,
       role: 'customer',
     })
-    console.log('Demo customer created: demo@fleetmart.com')
+    console.log(`Demo customer created: ${demoEmail}`)
 
     // Create categories
     await Category.insertMany(CATEGORIES)

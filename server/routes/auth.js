@@ -98,6 +98,37 @@ router.post('/login', [
   } catch (err) { next(err) }
 })
 
+// POST /api/auth/admin-login — separate admin login (rejects non-admins)
+router.post('/admin-login', [
+  body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+  body('password').notEmpty().withMessage('Password is required'),
+], async (req, res, next) => {
+  try {
+    if (!validate(req, res)) return
+
+    const { email, password } = req.body
+
+    const user = await User.findOne({ email }).select('+password')
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid credentials' })
+    }
+    if (user.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required' })
+    }
+    if (!(await user.comparePassword(password))) {
+      return res.status(401).json({ message: 'Invalid credentials' })
+    }
+    if (!user.isActive) {
+      return res.status(403).json({ message: 'Account is deactivated' })
+    }
+
+    const token = generateToken(user._id)
+    const refresh = generateRefreshToken(user._id)
+    setCookies(res, token, refresh)
+    res.json({ user, token })
+  } catch (err) { next(err) }
+})
+
 // POST /api/auth/google
 router.post('/google', [
   body('credential').notEmpty().withMessage('Google credential is required'),
@@ -403,7 +434,16 @@ router.put('/addresses', protect, [
     if (!validate(req, res)) return
     const { addresses } = req.body
     const user = await User.findById(req.user._id)
-    user.addresses = addresses
+    // Whitelist and sanitize address fields
+    user.addresses = addresses.map(a => ({
+      label: String(a.label || 'Home').slice(0, 50),
+      street: String(a.street || '').slice(0, 200),
+      city: String(a.city || '').slice(0, 100),
+      zip: String(a.zip || '').slice(0, 20),
+      country: String(a.country || 'Bangladesh').slice(0, 100),
+      phone: String(a.phone || '').slice(0, 20),
+      isDefault: Boolean(a.isDefault),
+    }))
     await user.save()
     res.json({ user })
   } catch (err) { next(err) }
@@ -417,7 +457,13 @@ router.put('/billing', protect, [
     if (!validate(req, res)) return
     const { billing } = req.body
     const user = await User.findById(req.user._id)
-    user.billing = { ...user.billing, ...billing }
+    // Whitelist and sanitize billing fields
+    user.billing = {
+      name: String(billing.name || '').slice(0, 100),
+      email: String(billing.email || '').slice(0, 100),
+      phone: String(billing.phone || '').slice(0, 20),
+      taxId: String(billing.taxId || '').slice(0, 50),
+    }
     await user.save()
     res.json({ user })
   } catch (err) { next(err) }
