@@ -39,11 +39,11 @@ export default async function ensureDemoProduct() {
       return
     }
 
-    const jerseyCategory = await Category.findOne({ id: 'jersey' }).select('_id')
-    if (!jerseyCategory) {
-      console.warn('[DEMO] Category "jersey" not found — skipping demo product creation')
-      return
-    }
+    await Category.findOneAndUpdate(
+      { id: 'jersey' },
+      { $setOnInsert: { id: 'jersey', name: 'Jerseys', blurb: 'Club · National · Retro', isActive: true } },
+      { upsert: true, new: true }
+    )
 
     await Product.findOneAndUpdate(
       { slug: DEMO_PRODUCT.slug },
