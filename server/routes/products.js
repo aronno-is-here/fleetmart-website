@@ -1,10 +1,28 @@
 import { Router } from 'express'
 import Product from '../models/Product.js'
 import Category from '../models/Category.js'
+import Brand from '../models/Brand.js'
+import Team from '../models/Team.js'
 import { protect, adminOnly } from '../middleware/auth.js'
 import { escapeRegex } from '../utils/sanitize.js'
 
 const router = Router()
+
+async function validateProductRefs({ brand, team, category }) {
+  if (brand) {
+    const b = await Brand.findOne({ slug: brand })
+    if (!b) return { ok: false, message: `Brand "${brand}" not found` }
+  }
+  if (team) {
+    const t = await Team.findOne({ slug: team })
+    if (!t) return { ok: false, message: `Team "${team}" not found` }
+  }
+  if (category) {
+    const c = await Category.findOne({ id: category })
+    if (!c) return { ok: false, message: `Category "${category}" not found` }
+  }
+  return { ok: true }
+}
 
 // GET /api/products — public, with filters
 router.get('/', async (req, res, next) => {
@@ -70,6 +88,9 @@ router.post('/', protect, adminOnly, async (req, res, next) => {
   try {
     const { name, slug, description, category, subCategory, categoryPath, brand, team, league, price, discountPrice, stock, images, featured, isNew, customizable, sizeChartType, artColors, isActive } = req.body
 
+    const refCheck = await validateProductRefs({ brand, team, category })
+    if (!refCheck.ok) return res.status(400).json({ message: refCheck.message })
+
     // Auto-build categoryPath if not provided
     let resolvedPath = categoryPath || []
     if (!resolvedPath.length && category) {
@@ -91,6 +112,9 @@ router.post('/', protect, adminOnly, async (req, res, next) => {
 router.put('/:id', protect, adminOnly, async (req, res, next) => {
   try {
     const { name, slug, description, category, subCategory, categoryPath, brand, team, league, price, discountPrice, stock, images, featured, isNew, customizable, sizeChartType, artColors, isActive } = req.body
+
+    const refCheck = await validateProductRefs({ brand, team, category })
+    if (!refCheck.ok) return res.status(400).json({ message: refCheck.message })
 
     const update = { name, slug, description, category, subCategory, brand, team, league, price, discountPrice, stock, images, featured, isNew, customizable, sizeChartType, artColors, isActive }
     if (categoryPath !== undefined) update.categoryPath = categoryPath

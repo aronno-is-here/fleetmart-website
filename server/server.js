@@ -29,6 +29,7 @@ import brandRoutes from './routes/brands.js'
 import teamRoutes from './routes/teams.js'
 import ensureDemoProduct from './startup/ensureDemoProduct.js'
 import ensureTaxonomy from './startup/ensureTaxonomy.js'
+import migrateProductReferences from './startup/migrateProductReferences.js'
 
 // Validate required env vars
 const requiredEnv = ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'MONGODB_URI']
@@ -104,6 +105,7 @@ if (process.env.VERCEL) {
         dbConnected = true
         ensureDemoProduct()
         ensureTaxonomy()
+        migrateProductReferences()
       } catch (err) {
         console.error('Database connection failed:', err.message)
       }
@@ -158,6 +160,7 @@ if (!process.env.VERCEL) {
   connectDB().then(() => {
     ensureDemoProduct()
     ensureTaxonomy()
+    migrateProductReferences()
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
   })
 }

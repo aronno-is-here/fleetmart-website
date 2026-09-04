@@ -71,7 +71,7 @@ router.delete('/:id', protect, adminOnly, async (req, res, next) => {
     const brand = await Brand.findById(req.params.id)
     if (!brand) return res.status(404).json({ message: 'Brand not found' })
 
-    const productCount = await Product.countDocuments({ brand: brand.name })
+    const productCount = await Product.countDocuments({ brand: brand.slug })
     if (productCount > 0) {
       return res.status(400).json({ message: `Cannot delete brand used by ${productCount} product(s). Deactivate instead.` })
     }

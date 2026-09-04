@@ -124,7 +124,7 @@ export default function Shop() {
       </FilterGroup>
       <FilterGroup title="Brand">
         {brands.map((b) => (
-          <CheckRow key={b._id} checked={brand === b.name} onChange={() => setParam('brand', brand === b.name ? '' : b.name)} label={b.name} />
+          <CheckRow key={b._id} checked={brand === b.slug} onChange={() => setParam('brand', brand === b.slug ? '' : b.slug)} label={b.name} />
         ))}
       </FilterGroup>
       <FilterGroup title="Team / Nation">

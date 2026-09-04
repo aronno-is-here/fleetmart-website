@@ -7,7 +7,7 @@ const DEMO_PRODUCT = {
   description: 'Demo jersey product for testing FleetMart payment flow.',
   category: 'jersey',
   subCategory: 'Club',
-  brand: 'Fleetmart Pro',
+  brand: 'fleetmart-pro',
   team: null,
   league: null,
   price: 20,

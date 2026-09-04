@@ -47,6 +47,22 @@ async function cascadePathUpdate(categoryId, newPath, newLevel) {
   }
 }
 
+async function cascadeProductCategoryPath(categoryId) {
+  const descendant = await Category.find({ parent: categoryId }).select('_id id')
+  const ids = [categoryId, ...descendant.map(c => c._id)]
+  const products = await Product.find({ categoryPath: { $in: ids } })
+  for (const p of products) {
+    const newPath = []
+    let current = await Category.findOne({ id: p.category })
+    while (current) {
+      newPath.unshift(current.id)
+      current = current.parent ? await Category.findById(current.parent) : null
+    }
+    p.categoryPath = newPath
+    await p.save()
+  }
+}
+
 function buildTree(categories, parentId = null) {
   return categories
     .filter(c => {
@@ -206,6 +222,9 @@ router.put('/:id', protect, adminOnly, async (req, res, next) => {
 
     // Cascade path updates to all descendants
     await cascadePathUpdate(category._id, category.path, category.level)
+
+    // Cascade categoryPath updates to affected products
+    await cascadeProductCategoryPath(category._id)
 
     // Update parent's blurb if it uses autoBlurb
     if (category.parent) {

@@ -338,7 +338,7 @@ export default function AdminProducts() {
                   <select value={form.brand} onChange={e => setForm({ ...form, brand: e.target.value })} className="input-fm">
                     <option value="">No brand</option>
                     {brands.map(b => (
-                      <option key={b._id} value={b.name}>{b.name}</option>
+                      <option key={b._id} value={b.slug}>{b.name}</option>
                     ))}
                   </select>
                 </div>
