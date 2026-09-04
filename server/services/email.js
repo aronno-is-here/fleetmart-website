@@ -187,7 +187,7 @@ export const buildOrderReceiptEmail = (order) => {
       <p style="margin:0;color:#ccc;font-size:14px;line-height:1.6;">
         ${order.shippingAddress.name ? `<strong>${escapeHtml(order.shippingAddress.name)}</strong><br>` : ''}
         ${order.shippingAddress.street ? `${escapeHtml(order.shippingAddress.street)}<br>` : ''}
-        ${order.shippingAddress.city ? `${escapeHtml(order.shippingAddress.city)}` : ''}${order.shippingAddress.zip ? ` ${escapeHtml(order.shippingAddress.zip)}` : ''}
+        ${order.shippingAddress.city ? `${escapeHtml(order.shippingAddress.city)}` : ''}${order.shippingAddress.district ? `, ${escapeHtml(order.shippingAddress.district)}` : ''}${order.shippingAddress.zip ? ` ${escapeHtml(order.shippingAddress.zip)}` : ''}
         ${order.shippingAddress.country ? `, ${escapeHtml(order.shippingAddress.country)}` : ''}
         ${order.shippingAddress.phone ? `<br>Phone: ${escapeHtml(order.shippingAddress.phone)}` : ''}
       </p>

@@ -68,7 +68,7 @@ router.get('/:slug', async (req, res, next) => {
 // POST /api/products — admin
 router.post('/', protect, adminOnly, async (req, res, next) => {
   try {
-    const { name, slug, description, category, subCategory, categoryPath, brand, team, league, price, discountPrice, stock, images, featured, isNew, customizable, artColors, isActive } = req.body
+    const { name, slug, description, category, subCategory, categoryPath, brand, team, league, price, discountPrice, stock, images, featured, isNew, customizable, sizeChartType, artColors, isActive } = req.body
 
     // Auto-build categoryPath if not provided
     let resolvedPath = categoryPath || []
@@ -81,7 +81,7 @@ router.post('/', protect, adminOnly, async (req, res, next) => {
       name, slug, description, category, subCategory,
       categoryPath: resolvedPath,
       brand, team, league, price, discountPrice, stock, images,
-      featured, isNew, customizable, artColors, isActive,
+      featured, isNew, customizable, sizeChartType, artColors, isActive,
     })
     res.status(201).json({ product })
   } catch (err) { next(err) }
@@ -90,9 +90,9 @@ router.post('/', protect, adminOnly, async (req, res, next) => {
 // PUT /api/products/:id — admin
 router.put('/:id', protect, adminOnly, async (req, res, next) => {
   try {
-    const { name, slug, description, category, subCategory, categoryPath, brand, team, league, price, discountPrice, stock, images, featured, isNew, customizable, artColors, isActive } = req.body
+    const { name, slug, description, category, subCategory, categoryPath, brand, team, league, price, discountPrice, stock, images, featured, isNew, customizable, sizeChartType, artColors, isActive } = req.body
 
-    const update = { name, slug, description, category, subCategory, brand, team, league, price, discountPrice, stock, images, featured, isNew, customizable, artColors, isActive }
+    const update = { name, slug, description, category, subCategory, brand, team, league, price, discountPrice, stock, images, featured, isNew, customizable, sizeChartType, artColors, isActive }
     if (categoryPath !== undefined) update.categoryPath = categoryPath
 
     const product = await Product.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true })

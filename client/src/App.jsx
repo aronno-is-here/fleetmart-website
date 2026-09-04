@@ -10,6 +10,7 @@ const ProductDetails = lazy(() => import('./pages/ProductDetails'))
 const Cart = lazy(() => import('./pages/Cart'))
 const Checkout = lazy(() => import('./pages/Checkout'))
 const OrderSuccess = lazy(() => import('./pages/OrderSuccess'))
+const OrderLookup = lazy(() => import('./pages/OrderLookup'))
 const Login = lazy(() => import('./pages/Login'))
 const Register = lazy(() => import('./pages/Register'))
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
@@ -59,6 +60,7 @@ const router = createBrowserRouter([
       { path: '/cart', element: withSuspense(Cart) },
       { path: '/checkout', element: withSuspense(Checkout) },
       { path: '/order/success', element: withSuspense(OrderSuccess) },
+      { path: '/order/lookup', element: withSuspense(OrderLookup) },
       { path: '/login', element: withSuspense(Login) },
       { path: '/register', element: withSuspense(Register) },
       { path: '/forgot-password', element: withSuspense(ForgotPassword) },

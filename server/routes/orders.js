@@ -10,6 +10,7 @@ import { processRefund } from '../services/refund.js'
 
 const UDDOKTAPAY_API_KEY = process.env.UDDOKTAPAY_API_KEY || ''
 const UDDOKTAPAY_BASE_URL = process.env.UDDOKTAPAY_BASE_URL || 'https://sandbox.uddoktapay.com'
+const CUSTOMIZATION_FEE = 250
 
 const isUddoktaPayConfigured = () => Boolean(UDDOKTAPAY_API_KEY)
 
@@ -41,6 +42,26 @@ router.get('/lookup/:orderId', async (req, res, next) => {
     const order = await Order.findOne({ orderId: req.params.orderId })
       .select('orderId orderStatus paymentStatus paymentMethod total createdAt')
     if (!order) return res.status(404).json({ message: 'Order not found' })
+    res.json({ order })
+  } catch (err) { next(err) }
+})
+
+// POST /api/orders/guest-lookup — guest order lookup with email verification
+router.post('/guest-lookup', async (req, res, next) => {
+  try {
+    const { orderId, email } = req.body
+    if (!orderId || !email) {
+      return res.status(400).json({ message: 'Order ID and email are required' })
+    }
+    const safeEmail = escapeRegex(email.trim())
+    const safeOrderId = escapeRegex(orderId.trim())
+    const order = await Order.findOne({
+      orderId: { $regex: safeOrderId, $options: 'i' },
+      $or: [
+        { guestEmail: { $regex: safeEmail, $options: 'i' } },
+      ],
+    }).select('orderId items shippingAddress paymentMethod paymentType paymentStatus orderStatus amountPaid remainingAmount total subtotal shippingFee discount couponCode note createdAt statusHistory')
+    if (!order) return res.status(404).json({ message: 'Order not found. Check your Order ID and email.' })
     res.json({ order })
   } catch (err) { next(err) }
 })
@@ -85,13 +106,21 @@ router.get('/', protect, adminOnly, async (req, res, next) => {
 // PUT /api/orders/:id/status — admin
 router.put('/:id/status', protect, adminOnly, async (req, res, next) => {
   try {
-    const { status, note } = req.body
+    const { status, paymentStatus, note } = req.body
     const order = await Order.findById(req.params.id).populate('user', 'name email')
     if (!order) return res.status(404).json({ message: 'Order not found' })
 
-    order.orderStatus = status
-    order.statusHistory.push({ status, timestamp: new Date(), note })
-    if (status === 'delivered' && order.paymentStatus !== 'paid') order.paymentStatus = 'paid'
+    if (status) {
+      order.orderStatus = status
+      order.statusHistory.push({ status, timestamp: new Date(), note })
+      if (status === 'delivered' && order.paymentStatus !== 'paid') order.paymentStatus = 'paid'
+    }
+    if (paymentStatus) {
+      const VALID_PAYMENT_STATUSES = ['pending', 'partial', 'paid', 'failed', 'refunded', 'refund_requested', 'refund_failed']
+      if (VALID_PAYMENT_STATUSES.includes(paymentStatus)) {
+        order.paymentStatus = paymentStatus
+      }
+    }
     await order.save()
 
     // ── Auto-refund when admin cancels a paid/partial order ──
@@ -143,24 +172,58 @@ router.post('/', protect, async (req, res, next) => {
       return res.status(400).json({ message: 'Invalid payment method' })
     }
 
+    // ── Server-side amount recalculation (never trust client totals) ──
+    const productIds = items.map(i => i.product).filter(Boolean)
+    const dbProducts = await Product.find({ _id: { $in: productIds } })
+    const productMap = Object.fromEntries(dbProducts.map(p => [p._id.toString(), p]))
+
+    let subtotal = 0
+    const validatedItems = []
+    for (const i of items) {
+      const dbProduct = productMap[i.product]
+      if (!dbProduct) continue
+      const basePrice = dbProduct.price
+      const hasCustomization = i.customization && (i.customization.name || i.customization.number)
+      const unitPrice = hasCustomization ? basePrice + CUSTOMIZATION_FEE : basePrice
+      const qty = Math.max(1, Math.floor(Number(i.qty) || 1))
+      subtotal += unitPrice * qty
+      validatedItems.push({
+        product: i.product,
+        name: i.name,
+        size: i.size,
+        qty,
+        price: unitPrice,
+        customization: i.customization || (i.artColors ? { name: i.artColors.name || '', number: i.artColors.number || '' } : undefined),
+      })
+    }
+
+    if (validatedItems.length === 0) {
+      return res.status(400).json({ message: 'No valid items found' })
+    }
+
+    const shippingFee = subtotal >= 3000 ? 0 : 80
+    let discount = 0
+    if (couponCode) {
+      const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true })
+      if (coupon && (!coupon.expiresAt || coupon.expiresAt > new Date()) && (coupon.maxUses <= 0 || coupon.usedCount < coupon.maxUses) && subtotal >= coupon.minOrder) {
+        discount = coupon.discountType === 'percent' ? Math.round(subtotal * coupon.value / 100) : Math.min(coupon.value, subtotal)
+        await Coupon.updateOne({ _id: coupon._id }, { $inc: { usedCount: 1 } })
+      }
+    }
+    const grand = Math.max(0, subtotal + shippingFee - discount)
+
     const crypto = await import('crypto')
     const orderId = `FM-${Date.now().toString(36).toUpperCase()}-${crypto.default.randomBytes(3).toString('hex').toUpperCase()}`
 
     const order = await Order.create({
       orderId,
       user: req.user._id,
-      items: items.map((i) => ({
-        product: i.product,
-        name: i.name,
-        size: i.size,
-        qty: i.qty,
-        price: i.price,
-        customization: i.artColors ? { name: i.artColors.name || '', number: i.artColors.number || '' } : undefined,
-      })),
+      items: validatedItems,
       shippingAddress: {
         label: 'Delivery',
         street: shipping?.street || '',
         city: shipping?.city || '',
+        district: shipping?.district || '',
         zip: shipping?.zip || '',
         country: shipping?.country || 'Bangladesh',
         phone: shipping?.phone || '',
@@ -169,18 +232,18 @@ router.post('/', protect, async (req, res, next) => {
       paymentMethod: 'uddoktapay',
       paymentType: 'full',
       amountPaid: 0,
-      remainingAmount: totals?.grand || 0,
-      subtotal: totals?.subtotal || 0,
-      shippingFee: totals?.shipping || 0,
-      discount: totals?.discount || 0,
-      total: totals?.grand || 0,
+      remainingAmount: grand,
+      subtotal,
+      shippingFee,
+      discount,
+      total: grand,
       couponCode: couponCode || null,
       note: note || '',
       statusHistory: [{ status: 'processing', timestamp: new Date() }],
       paymentStatus: 'pending',
     })
 
-    for (const item of items) {
+    for (const item of validatedItems) {
       if (item.product && item.size) {
         const result = await Product.updateOne(
           { _id: item.product, [`stock.${item.size}`]: { $gte: item.qty } },

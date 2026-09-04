@@ -12,20 +12,32 @@ const empty = {
   images: [], categoryPath: [],
 }
 
-function CategoryPicker({ value, onChange, categories }) {
-  const [selected, setSelected] = useState(value ? [value] : [])
+function CategoryPicker({ value, categoryPath, onChange, categories }) {
+  const [selected, setSelected] = useState([])
 
   useEffect(() => {
-    if (value) setSelected([value])
-    else setSelected([])
-  }, [value])
+    if (categoryPath && categoryPath.length) {
+      const chain = categoryPath.map(catId => {
+        const cat = categories.find(c => c.id === catId)
+        return cat ? cat._id : null
+      }).filter(Boolean)
+      setSelected(chain)
+    } else if (value) {
+      const cat = categories.find(c => c.id === value)
+      if (cat) setSelected([cat._id])
+      else setSelected([value])
+    } else {
+      setSelected([])
+    }
+  }, [value, categoryPath, categories])
 
   const rootCats = categories.filter(c => !c.parent)
   const childrenMap = {}
   categories.forEach(c => {
     if (c.parent) {
-      if (!childrenMap[c.parent]) childrenMap[c.parent] = []
-      childrenMap[c.parent].push(c)
+      const parentId = typeof c.parent === 'object' ? c.parent.toString() : c.parent
+      if (!childrenMap[parentId]) childrenMap[parentId] = []
+      childrenMap[parentId].push(c)
     }
   })
 
@@ -33,7 +45,8 @@ function CategoryPicker({ value, onChange, categories }) {
     const cat = cats.find(c => c._id === catId)
     if (!cat) return [catId]
     if (!cat.parent) return [cat.id]
-    return [...findPath(cat.parent, cats), cat.id]
+    const parentId = typeof cat.parent === 'object' ? cat.parent.toString() : cat.parent
+    return [...findPath(parentId, cats), cat.id]
   }
 
   const handleChange = (level, catId) => {
@@ -49,12 +62,14 @@ function CategoryPicker({ value, onChange, categories }) {
   }
 
   const levels = [[]]
-  const firstLevel = selected[0]
-  if (firstLevel && childrenMap[firstLevel]) {
-    levels.push(childrenMap[firstLevel])
+  if (selected[0] && childrenMap[selected[0]]) {
+    levels.push(childrenMap[selected[0]])
   }
   if (selected[1] && childrenMap[selected[1]]) {
     levels.push(childrenMap[selected[1]])
+  }
+  if (selected[2] && childrenMap[selected[2]]) {
+    levels.push(childrenMap[selected[2]])
   }
 
   return (
@@ -77,6 +92,14 @@ function CategoryPicker({ value, onChange, categories }) {
         <select value={selected[2] || ''} onChange={e => handleChange(2, e.target.value)} className="input-fm">
           <option value="">Select sub-subcategory</option>
           {levels[2].map(c => (
+            <option key={c._id} value={c._id}>{c.name} ({c.id})</option>
+          ))}
+        </select>
+      )}
+      {levels[3] && levels[3].length > 0 && (
+        <select value={selected[3] || ''} onChange={e => handleChange(3, e.target.value)} className="input-fm">
+          <option value="">Select team/leaf</option>
+          {levels[3].map(c => (
             <option key={c._id} value={c._id}>{c.name} ({c.id})</option>
           ))}
         </select>
@@ -329,7 +352,7 @@ export default function AdminProducts() {
 
               <div>
                 <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1">Category (cascading)</label>
-                <CategoryPicker value={form.category} onChange={handleCategoryChange} categories={flatCats} />
+                <CategoryPicker value={form.category} categoryPath={form.categoryPath} onChange={handleCategoryChange} categories={flatCats} />
               </div>
 
               <div>
@@ -355,6 +378,18 @@ export default function AdminProducts() {
                   <input type="checkbox" checked={form.customizable} onChange={e => setForm({ ...form, customizable: e.target.checked })} className="accent-volt" />
                   Customizable
                 </label>
+              </div>
+
+              <div>
+                <label className="block text-xs font-head text-muted uppercase tracking-widest mb-1">Size Chart Type</label>
+                <select value={form.sizeChartType || ''} onChange={e => setForm({ ...form, sizeChartType: e.target.value || null })} className="input-fm">
+                  <option value="">None (default Fan chart)</option>
+                  <option value="player_jersey">Player Edition Jersey</option>
+                  <option value="fan_jersey">Fan Edition Jersey</option>
+                  <option value="retro_jersey">Retro Edition Jersey</option>
+                  <option value="boot">Football Boot</option>
+                  <option value="accessory">Accessories</option>
+                </select>
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-line">

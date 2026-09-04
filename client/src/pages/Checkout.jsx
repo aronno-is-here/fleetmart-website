@@ -29,7 +29,7 @@ export default function Checkout() {
   const [done, setDone] = useState(false)
   const [placing, setPlacing] = useState(false)
   const [orderId, setOrderId] = useState('')
-  const [addr, setAddr] = useState({ name: '', phone: '', email: '', street: '', city: 'Dhaka', zip: '' })
+  const [addr, setAddr] = useState({ name: '', phone: '', email: '', street: '', city: 'Dhaka', district: '', zip: '', note: '' })
   const [timer, setTimer] = useState(null)
 
   const { token, user } = useSelector((s) => s.auth)
@@ -64,7 +64,8 @@ export default function Checkout() {
 
   const canNext = () => {
     if (step === 0) {
-      return addr.name && addr.phone && addr.street && (token || addr.email)
+      const phoneOk = /^01[3-9]\d{8}$/.test(addr.phone)
+      return addr.name && phoneOk && addr.street && addr.city && (token || addr.email)
     }
     return true
   }
@@ -79,13 +80,14 @@ export default function Checkout() {
           size: i.size,
           qty: i.qty,
           price: i.price,
-          artColors: i.artColors,
+          customization: i.customization || null,
         })),
         shipping: {
           name: addr.name,
           phone: addr.phone,
           street: addr.street,
           city: addr.city,
+          district: addr.district || '',
           zip: addr.zip,
           country: 'Bangladesh',
         },
@@ -93,7 +95,7 @@ export default function Checkout() {
         shippingMethod: ship,
         couponCode: passed.couponCode || '',
         totals: { subtotal: total, discount, shipping: shipFee, grand: finalTotal },
-        note: '',
+        note: addr.note || '',
         guestInfo: !token ? { name: addr.name, email: addr.email, phone: addr.phone } : undefined,
       })
 
@@ -183,11 +185,22 @@ export default function Checkout() {
               {!token && (
                 <input type="email" placeholder="Email (for receipt)" value={addr.email} onChange={(e) => setAddr({ ...addr, email: e.target.value })} className="input-fm sm:col-span-2" />
               )}
-              <input placeholder="Street / House / Road" value={addr.street} onChange={(e) => setAddr({ ...addr, street: e.target.value })} className="input-fm sm:col-span-2" />
-              <select value={addr.city} onChange={(e) => setAddr({ ...addr, city: e.target.value })} className="input-fm">
-                {['Dhaka', 'Chattogram', 'Sylhet', 'Khulna', 'Rajshahi', 'Barishal', 'Rangpur', 'Mymensingh'].map((c) => <option key={c}>{c}</option>)}
-              </select>
-              <input placeholder="Area / Post code" value={addr.zip} onChange={(e) => setAddr({ ...addr, zip: e.target.value })} className="input-fm" />
+              <input placeholder="Street / House / Road / Area" value={addr.street} onChange={(e) => setAddr({ ...addr, street: e.target.value })} className="input-fm sm:col-span-2" />
+              <div>
+                <label className="mb-1 block text-xs uppercase tracking-widest text-muted">Division</label>
+                <select value={addr.city} onChange={(e) => setAddr({ ...addr, city: e.target.value })} className="input-fm">
+                  {['Dhaka', 'Chattogram', 'Sylhet', 'Khulna', 'Rajshahi', 'Barishal', 'Rangpur', 'Mymensingh'].map((c) => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs uppercase tracking-widest text-muted">District</label>
+                <input placeholder="District (e.g. Gazipur)" value={addr.district || ''} onChange={(e) => setAddr({ ...addr, district: e.target.value })} className="input-fm" />
+              </div>
+              <input placeholder="Postal Code" value={addr.zip} onChange={(e) => setAddr({ ...addr, zip: e.target.value })} className="input-fm" />
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-xs uppercase tracking-widest text-muted">Order Notes (optional)</label>
+                <textarea placeholder="Special instructions for delivery..." value={addr.note || ''} onChange={(e) => setAddr({ ...addr, note: e.target.value })} rows={2} className="input-fm" />
+              </div>
             </div>
           )}
 

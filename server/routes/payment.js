@@ -15,6 +15,7 @@ const UDDOKTAPAY_BASE_URL = process.env.UDDOKTAPAY_BASE_URL || 'https://sandbox.
 const SITE_URL = process.env.SITE_URL || 'https://fleetmartbd.vercel.app'
 
 const PARTIAL_PAYMENT_AMOUNT = 300
+const CUSTOMIZATION_FEE = 250
 
 const isUddoktaPayConfigured = () => Boolean(UDDOKTAPAY_API_KEY)
 
@@ -40,13 +41,19 @@ const recalculateAmounts = async (items, couponCode) => {
   const productMap = Object.fromEntries(dbProducts.map(p => [p._id.toString(), p]))
 
   let subtotal = 0
-  const validatedItems = items.map(i => {
+  const validatedItems = []
+  for (const i of items) {
     const dbProduct = productMap[i.product]
-    const price = dbProduct ? dbProduct.price : i.price
+    if (!dbProduct) {
+      continue
+    }
+    const basePrice = dbProduct.price
+    const hasCustomization = i.customization && (i.customization.name || i.customization.number)
+    const unitPrice = hasCustomization ? basePrice + CUSTOMIZATION_FEE : basePrice
     const qty = Math.max(1, Math.floor(Number(i.qty) || 1))
-    subtotal += price * qty
-    return { ...i, price, qty }
-  })
+    subtotal += unitPrice * qty
+    validatedItems.push({ ...i, price: unitPrice, qty })
+  }
 
   const shippingFee = subtotal >= 3000 ? 0 : 80
   let discount = 0
@@ -98,7 +105,7 @@ router.post('/initiate', optionalAuth, async (req, res, next) => {
         size: i.size,
         qty: i.qty,
         price: i.price,
-        customization: i.artColors,
+        customization: i.customization || null,
       })),
       shippingAddress: {
         label: 'Delivery',
@@ -192,7 +199,12 @@ router.post('/success', async (req, res, next) => {
     }
 
     // ── Find the payment attempt by attemptId from metadata ──
-    const metadata = typeof verification.metadata === 'string' ? JSON.parse(verification.metadata) : verification.metadata
+    let metadata
+    try {
+      metadata = typeof verification.metadata === 'string' ? JSON.parse(verification.metadata) : verification.metadata
+    } catch {
+      return res.redirect(`${SITE_URL}/checkout?payment=error`)
+    }
     const attemptId = metadata?.attemptId
 
     if (!attemptId) {
@@ -362,7 +374,12 @@ router.post('/ipn', async (req, res) => {
     const verification = await uddoktapayRequest('/verify-payment', { invoice_id })
 
     if (verification.status === 'COMPLETED') {
-      const metadata = typeof verification.metadata === 'string' ? JSON.parse(verification.metadata) : verification.metadata
+      let metadata
+      try {
+        metadata = typeof verification.metadata === 'string' ? JSON.parse(verification.metadata) : verification.metadata
+      } catch {
+        return res.json({ message: 'IPN received' })
+      }
       const attemptId = metadata?.attemptId
 
       if (attemptId) {

@@ -12,60 +12,28 @@ import SEO from '../components/SEO'
 import { fmt } from '../lib/format'
 import api from '../lib/api'
 
-const FALLBACK_SLIDES = [
-  {
-    eyebrow: 'New Season · 25/26 Kits',
-    title: 'WEAR YOUR\nCOLOURS',
-    sub: 'Official club & national jerseys with custom name and number printing. Printed in hours, not days.',
-    cta: { label: 'Shop Jerseys', to: '/shop?category=jersey' },
-    team: TEAMS.omega,
-  },
-  {
-    eyebrow: 'Limited Drop · 500 pieces',
-    title: 'VOLT ARMADA\nSPECIAL EDITION',
-    sub: 'Charcoal blackout sliced with volt lightning sleeves. Numbered run — when it\'s gone, it\'s gone.',
-    cta: { label: 'Grab Yours', to: '/product/volt-armada-special' },
-    team: TEAMS.voltarmada,
-  },
-  {
-    eyebrow: 'Boots That Bite',
-    title: 'SPEED IS A\nWEAPON',
-    sub: 'Featherweight FG & turf boots from ৳2,999. Grip engineered for artificial grass.',
-    cta: { label: 'Shop Boots', to: '/shop?category=boots' },
-    team: null,
-  },
-]
-
 function Hero() {
   const [idx, setIdx] = useState(0)
   const [paused, setPaused] = useState(false)
-  const [slides, setSlides] = useState(FALLBACK_SLIDES)
+  const [banners, setBanners] = useState([])
   const timer = useRef(null)
 
   useEffect(() => {
     api.get('/banners').then(({ data }) => {
-      if (data.banners?.length) {
-        const mapped = data.banners.map(b => ({
-          eyebrow: b.title || '',
-          title: '',
-          sub: '',
-          imageUrl: b.imageUrl,
-          targetUrl: b.targetUrl,
-          cta: { label: 'Shop Now', to: b.targetUrl || '/shop' },
-          team: null,
-        }))
-        setSlides(mapped)
-      }
+      if (data.banners?.length) setBanners(data.banners)
     }).catch(() => {})
   }, [])
 
-  useEffect(() => {
-    if (paused) return
-    timer.current = setInterval(() => setIdx((i) => (i + 1) % slides.length), 6000)
-    return () => clearInterval(timer.current)
-  }, [paused, slides.length])
+  const hasBanners = banners.length > 0
+  const slideCount = hasBanners ? banners.length : 1
 
-  const s = slides[idx]
+  useEffect(() => {
+    if (paused || !hasBanners) return
+    timer.current = setInterval(() => setIdx((i) => (i + 1) % slideCount), 6000)
+    return () => clearInterval(timer.current)
+  }, [paused, slideCount, hasBanners])
+
+  const currentBanner = hasBanners ? banners[idx] : null
 
   return (
     <section
@@ -73,50 +41,59 @@ function Hero() {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      {s.imageUrl ? (
-        <div className="absolute inset-0">
-          <img src={s.imageUrl} alt={s.title || s.eyebrow || ''} className="w-full h-full object-cover opacity-60" />
-          <div className="absolute inset-0 bg-gradient-to-r from-night via-night/70 to-night/40" />
-        </div>
-      ) : (
-        <div className="pointer-events-none absolute inset-0 opacity-[0.06]">
-          <div className="absolute left-1/2 top-1/2 h-[560px] w-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-chalk" />
-          <div className="absolute left-1/2 top-0 h-full w-px bg-chalk" />
-          <div className="absolute bottom-0 left-1/2 h-56 w-[420px] -translate-x-1/2 border-2 border-b-0 border-chalk" />
-        </div>
-      )}
+      <div className="pointer-events-none absolute inset-0 opacity-[0.06]">
+        <div className="absolute left-1/2 top-1/2 h-[560px] w-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-chalk" />
+        <div className="absolute left-1/2 top-0 h-full w-px bg-chalk" />
+        <div className="absolute bottom-0 left-1/2 h-56 w-[420px] -translate-x-1/2 border-2 border-b-0 border-chalk" />
+      </div>
 
       <div className="container-fm relative grid min-h-[520px] items-center gap-10 py-14 lg:grid-cols-2 lg:py-20">
-        <motion.div key={idx} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: 'easeOut' }}>
-          {s.eyebrow && <p className="eyebrow mb-4">{s.eyebrow}</p>}
-          {s.title && (
-            <h1 className="whitespace-pre-line font-display text-7xl leading-[0.9] tracking-wide text-chalk sm:text-8xl lg:text-9xl">
-              {s.title.split('\n')[0]}
-              <br />
-              <span className="text-volt">{s.title.split('\n')[1]}</span>
-            </h1>
-          )}
-          {s.sub && <p className="mt-6 max-w-md text-base leading-relaxed text-muted">{s.sub}</p>}
+        {/* LEFT SIDE — FIXED, never changes */}
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: 'easeOut' }}>
+          <p className="eyebrow mb-4">New Season · 25/26 Kits</p>
+          <h1 className="whitespace-pre-line font-display text-7xl leading-[0.9] tracking-wide text-chalk sm:text-8xl lg:text-9xl">
+            WEAR YOUR<br />
+            <span className="text-volt">COLOURS</span>
+          </h1>
+          <p className="mt-6 max-w-md text-base leading-relaxed text-muted">
+            Official club & national jerseys with custom name and number printing. Printed in hours, not days.
+          </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link to={s.cta.to} className="btn-volt">
-              {s.cta.label} <ArrowRight size={16} />
+            <Link to="/shop?category=jersey" className="btn-volt">
+              Shop Jerseys <ArrowRight size={16} />
             </Link>
             <Link to="/shop" className="btn-ghost">Browse All</Link>
           </div>
         </motion.div>
 
-        {!s.imageUrl && (
-          <motion.div key={`art-${idx}`} initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.55, ease: 'easeOut' }} className="relative mx-auto w-full max-w-md">
+        {/* RIGHT SIDE — DYNAMIC, cycles through banners or shows default art */}
+        {hasBanners ? (
+          <motion.div
+            key={`banner-${idx}`}
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.55, ease: 'easeOut' }}
+            className="relative mx-auto w-full max-w-md"
+          >
+            <a href={currentBanner?.targetUrl || '/shop'} className="block">
+              <img
+                src={currentBanner?.imageUrl}
+                alt={currentBanner?.title || 'Banner'}
+                className="w-full h-auto object-contain rounded"
+              />
+            </a>
+          </motion.div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.55, ease: 'easeOut' }}
+            className="relative mx-auto w-full max-w-md"
+          >
             <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_40%,rgba(198,245,63,0.13),transparent_65%)]" />
-            {s.team ? (
-              <div className="animate-fadeUp">
-                <JerseyArt primary={s.team.primary} secondary={s.team.secondary} number="10" name="FLEET" view="front" />
-              </div>
-            ) : (
-              <div className="animate-fadeUp">
-                <BootArt primary="#C6F53F" secondary="#0A0E13" />
-              </div>
-            )}
+            <div className="animate-fadeUp">
+              <JerseyArt primary={TEAMS.omega.primary} secondary={TEAMS.omega.secondary} number="10" name="FLEET" view="front" />
+            </div>
             <div className="absolute -right-2 top-6 border border-volt/40 bg-night/85 px-4 py-2 backdrop-blur sm:-right-6">
               <p className="font-head text-xs uppercase tracking-[0.2em] text-muted">From</p>
               <p className="font-display text-3xl text-volt">৳1,499</p>
@@ -125,30 +102,33 @@ function Hero() {
         )}
       </div>
 
-      <div className="container-fm relative flex items-center gap-4 pb-8">
-        <button onClick={() => setIdx((idx - 1 + slides.length) % slides.length)} aria-label="Previous slide" className="grid h-10 w-10 place-items-center border border-line text-muted transition-colors hover:border-volt hover:text-volt">
-          <ChevronLeft size={18} />
-        </button>
-        <button onClick={() => setIdx((idx + 1) % slides.length)} aria-label="Next slide" className="grid h-10 w-10 place-items-center border border-line text-muted transition-colors hover:border-volt hover:text-volt">
-          <ChevronRight size={18} />
-        </button>
-        <div className="flex flex-1 gap-2">
-          {slides.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setIdx(i)}
-              aria-label={`Go to slide ${i + 1}`}
-              className="group relative h-1 flex-1 overflow-hidden bg-line"
-            >
-              <span
-                className={`absolute inset-y-0 left-0 bg-volt transition-all ${i === idx ? 'w-full duration-[6000ms] ease-linear' : 'w-0 duration-0'}`}
-                key={`${i}-${idx === i}-${paused}`}
-              />
-            </button>
-          ))}
+      {/* Carousel controls — only when multiple banners */}
+      {hasBanners && slideCount > 1 && (
+        <div className="container-fm relative flex items-center gap-4 pb-8">
+          <button onClick={() => setIdx((idx - 1 + slideCount) % slideCount)} aria-label="Previous slide" className="grid h-10 w-10 place-items-center border border-line text-muted transition-colors hover:border-volt hover:text-volt">
+            <ChevronLeft size={18} />
+          </button>
+          <button onClick={() => setIdx((idx + 1) % slideCount)} aria-label="Next slide" className="grid h-10 w-10 place-items-center border border-line text-muted transition-colors hover:border-volt hover:text-volt">
+            <ChevronRight size={18} />
+          </button>
+          <div className="flex flex-1 gap-2">
+            {banners.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setIdx(i)}
+                aria-label={`Go to slide ${i + 1}`}
+                className="group relative h-1 flex-1 overflow-hidden bg-line"
+              >
+                <span
+                  className={`absolute inset-y-0 left-0 bg-volt transition-all ${i === idx ? 'w-full duration-[6000ms] ease-linear' : 'w-0 duration-0'}`}
+                  key={`${i}-${idx === i}-${paused}`}
+                />
+              </button>
+            ))}
+          </div>
+          <span className="font-head text-sm tracking-widest text-muted">0{idx + 1} / 0{slideCount}</span>
         </div>
-        <span className="font-head text-sm tracking-widest text-muted">0{idx + 1} / 0{slides.length}</span>
-      </div>
+      )}
     </section>
   )
 }

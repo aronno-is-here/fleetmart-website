@@ -19,6 +19,7 @@ const productSchema = new mongoose.Schema({
   featured: { type: Boolean, default: false },
   isNew: { type: Boolean, default: false },
   customizable: { type: Boolean, default: false },
+  sizeChartType: { type: String, enum: ['player_jersey', 'fan_jersey', 'retro_jersey', 'boot', 'accessory'], default: null },
   artColors: {
     primary: { type: String, default: '#C6F53F' },
     secondary: { type: String, default: '#0A0E13' },

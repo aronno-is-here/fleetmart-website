@@ -10,12 +10,13 @@ import Rating from '../components/ui/Rating'
 import SectionHeading from '../components/ui/SectionHeading'
 import SEO from '../components/SEO'
 import { fmt, discounted, discountPct } from '../lib/format'
+import { getSizeChart } from '../data/sizeCharts'
 import { addToCart } from '../features/cartSlice'
 import { toggleWishlist, inWishlist } from '../features/wishlistSlice'
 import { setCartOpen, toast, pushRecentlyViewed } from '../features/uiSlice'
 import api from '../lib/api'
 
-const CUSTOM_FEE = 150
+const CUSTOM_FEE = 250
 
 function Accordion({ title, icon, children, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen)
@@ -39,10 +40,12 @@ export default function ProductDetails() {
   const [related, setRelated] = useState([])
   const wished = useSelector(inWishlist(product?._id))
 
-  const [view, setView] = useState('front')
+  const [activeImg, setActiveImg] = useState(0)
   const [size, setSize] = useState(null)
   const [qty, setQty] = useState(1)
   const [custom, setCustom] = useState({ name: '', number: '' })
+  const [zoomed, setZoomed] = useState(false)
+  const [zoomPos, setZoomPos] = useState({ x: 50, y: 50 })
 
   const [reviewEligibility, setReviewEligibility] = useState(null)
   const [showReviewForm, setShowReviewForm] = useState(false)
@@ -57,7 +60,7 @@ export default function ProductDetails() {
     setProduct(null)
     setReviews([])
     setRelated([])
-    setView('front')
+    setActiveImg(0)
     setSize(null)
     setQty(1)
     setCustom({ name: '', number: '' })
@@ -124,6 +127,7 @@ export default function ProductDetails() {
   const sizeStock = size != null ? product.stock[size] : null
 
   const team = product.team ? TEAMS[product.team] : null
+  const viewName = activeImg === 0 ? 'front' : 'back'
   const artCustom = team
     ? {}
     : {
@@ -132,8 +136,8 @@ export default function ProductDetails() {
         name: (custom.name || 'FLEET').toUpperCase(),
       }
   const jerseyCustom = team
-    ? { primary: team.primary, secondary: team.secondary, number: custom.number || '10', name: (custom.name || 'FLEET').toUpperCase(), view }
-    : { ...product.artColors, number: custom.number || '10', name: (custom.name || 'FLEET').toUpperCase(), view }
+    ? { primary: team.primary, secondary: team.secondary, number: custom.number || '10', name: (custom.name || 'FLEET').toUpperCase(), view: viewName }
+    : { ...product.artColors, number: custom.number || '10', name: (custom.name || 'FLEET').toUpperCase(), view: viewName }
 
   const addNow = (buyNow = false) => {
     const chosen = size || Object.keys(product.stock).find((s) => product.stock[s] > 0)
@@ -220,35 +224,60 @@ export default function ProductDetails() {
             initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.4 }}
-            className="relative aspect-square cursor-pointer overflow-hidden border border-line bg-night"
-            onClick={() => setView(view === 'front' ? 'back' : 'front')}
+            className="relative aspect-square cursor-zoom-in overflow-hidden border border-line bg-night"
+            onMouseEnter={() => setZoomed(true)}
+            onMouseLeave={() => setZoomed(false)}
+            onMouseMove={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect()
+              const x = ((e.clientX - rect.left) / rect.width) * 100
+              const y = ((e.clientY - rect.top) / rect.height) * 100
+              setZoomPos({ x, y })
+            }}
           >
             {product.images?.length > 0 ? (
-              <img src={product.images[0].url} alt={product.name} className="w-full h-full object-contain" />
+              <img
+                src={product.images[activeImg]?.url || product.images[0].url}
+                alt={product.images[activeImg]?.alt || product.name}
+                className="w-full h-full object-contain transition-transform duration-200"
+                style={zoomed ? { transform: 'scale(1.8)', transformOrigin: `${zoomPos.x}% ${zoomPos.y}%` } : {}}
+              />
             ) : (
-              <ProductArt product={product} view={view} custom={product.category === 'jersey' ? jerseyCustom : artCustom} />
+              <ProductArt product={product} view={viewName} custom={product.category === 'jersey' ? jerseyCustom : artCustom} />
             )}
             <div className="absolute left-3 top-3 flex flex-col gap-1.5">
               {pct > 0 && <span className="bg-ember px-2 py-1 font-head text-xs font-semibold uppercase tracking-widest text-white">-{pct}%</span>}
               {product.isNew && <span className="bg-volt px-2 py-1 font-head text-xs font-semibold uppercase tracking-widest text-night">New</span>}
             </div>
-            {product.images?.length > 1 && (
-              <span className="absolute bottom-3 left-1/2 -translate-x-1/2 border border-line bg-night/80 px-3 py-1 text-[10px] uppercase tracking-widest text-muted backdrop-blur">
-                Tap to flip · {view}
-              </span>
-            )}
           </motion.div>
           {product.images?.length > 1 && (
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
               {product.images.map((img, i) => (
                 <button
                   key={i}
-                  onClick={() => setView(i === 0 ? 'front' : 'back')}
-                  className={`aspect-[16/10] border bg-night transition-colors overflow-hidden ${view === (i === 0 ? 'front' : 'back') ? 'border-volt' : 'border-line hover:border-volt/50'}`}
+                  onClick={() => setActiveImg(i)}
+                  onMouseEnter={() => { setActiveImg(i) }}
+                  className={`relative shrink-0 h-16 w-16 border-2 bg-night transition-all overflow-hidden ${
+                    activeImg === i ? 'border-volt' : 'border-line hover:border-volt/50'
+                  }`}
                 >
-                  <img src={img.url} alt={img.alt} className="w-full h-full object-cover" />
+                  <img src={img.url} alt={img.alt || `${product.name} view ${i + 1}`} className="h-full w-full object-cover" />
+                  {activeImg === i && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-volt" />}
                 </button>
               ))}
+            </div>
+          )}
+          {product.images?.length <= 1 && (
+            <div className="mt-3 flex gap-2">
+              <button className="h-16 w-16 border-2 border-volt bg-night overflow-hidden">
+                {product.images?.[0] ? (
+                  <img src={product.images[0].url} alt={product.name} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="h-full w-full bg-pitch2 flex items-center justify-center text-[10px] text-muted">Front</div>
+                )}
+              </button>
+              <button className="h-16 w-16 border-2 border-line bg-night overflow-hidden flex items-center justify-center text-[10px] text-muted">
+                Back
+              </button>
             </div>
           )}
         </div>
@@ -375,18 +404,60 @@ export default function ProductDetails() {
               {product.description}
             </Accordion>
             <Accordion title="Size Chart">
-              <div className="overflow-hidden border border-line">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-pitch2 font-head uppercase tracking-widest text-chalk">
-                    <tr><th className="p-2.5">Size</th><th className="p-2.5">Chest (in)</th><th className="p-2.5">Length (in)</th></tr>
-                  </thead>
-                  <tbody className="text-muted">
-                    {[['S', '36-38', '26'], ['M', '38-40', '27'], ['L', '40-42', '28'], ['XL', '42-44', '29'], ['XXL', '44-46', '30']].map((r) => (
-                      <tr key={r[0]} className="border-t border-line"><td className="p-2.5">{r[0]}</td><td className="p-2.5">{r[1]}</td><td className="p-2.5">{r[2]}</td></tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              {(() => {
+                const chart = getSizeChart(product.sizeChartType || 'fan_jersey')
+                const isBoot = product.sizeChartType === 'boot'
+                return (
+                  <div>
+                    <p className="mb-1 font-head text-xs font-semibold uppercase tracking-widest text-chalk">{chart.label}</p>
+                    <p className="mb-3 text-xs text-muted">{chart.note}</p>
+                    <div className="overflow-hidden border border-line">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-pitch2 font-head uppercase tracking-widest text-chalk">
+                          <tr>
+                            <th className="p-2.5">Size</th>
+                            {isBoot ? (
+                              <>
+                                <th className="p-2.5">UK</th>
+                                <th className="p-2.5">US</th>
+                                <th className="p-2.5">EU</th>
+                                <th className="p-2.5">CM</th>
+                              </>
+                            ) : (
+                              <>
+                                <th className="p-2.5">Chest (in)</th>
+                                <th className="p-2.5">Length (in)</th>
+                                <th className="p-2.5">Fit</th>
+                              </>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody className="text-muted">
+                          {chart.sizes.map((r) => (
+                            <tr key={r.size} className="border-t border-line">
+                              <td className="p-2.5 font-semibold text-chalk">{r.size}</td>
+                              {isBoot ? (
+                                <>
+                                  <td className="p-2.5">{r.uk}</td>
+                                  <td className="p-2.5">{r.us}</td>
+                                  <td className="p-2.5">{r.eu}</td>
+                                  <td className="p-2.5">{r.cm}</td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className="p-2.5">{r.chest}</td>
+                                  <td className="p-2.5">{r.length}</td>
+                                  <td className="p-2.5">{r.fit}</td>
+                                </>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )
+              })()}
             </Accordion>
             <Accordion title="Delivery & Returns">
               Dhaka: 24–48 hours · Outside Dhaka: 2–4 days. Free delivery over ৳3,000. 7-day easy return on unworn items with tags.
