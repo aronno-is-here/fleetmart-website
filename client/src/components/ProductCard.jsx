@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { Heart, Eye, ShoppingBag } from 'lucide-react'
 import { ProductArt, StudioArt } from './ProductArt'
@@ -23,6 +23,7 @@ export function ProductCardSkeleton() {
 
 export default function ProductCard({ product, hideArt = false }) {
   const dispatch = useDispatch()
+  const navigate = useNavigate()
   const wished = useSelector(inWishlist(product._id))
   const price = discounted(product)
   const pct = discountPct(product)
@@ -39,12 +40,24 @@ export default function ProductCard({ product, hideArt = false }) {
 
   const quickAdd = (e) => {
     e.preventDefault()
+    e.stopPropagation()
+
+    if (product.customizable) {
+      navigate(`/product/${product.slug}`)
+      dispatch(toast({ type: 'info', message: 'Choose a name and number to customize this item.' }))
+      return
+    }
+
     const size = defaultSize()
+    if (!size) {
+      dispatch(toast({ type: 'error', message: 'Out of stock' }))
+      return
+    }
+
     dispatch(
       addToCart({
         id: product._id, slug: product.slug, name: product.name, price,
         art: product.artColors || null, size,
-        customization: product.customizable ? { name: 'FLEET', number: '10' } : null,
       })
     )
     dispatch(toast({ type: 'success', message: `${product.name} · ${size} added to bag` }))

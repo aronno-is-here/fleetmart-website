@@ -1,11 +1,14 @@
 import { Router } from 'express'
 import crypto from 'crypto'
 import axios from 'axios'
+import Coupon from '../models/Coupon.js'
 import Order from '../models/Order.js'
 import PaymentAttempt from '../models/PaymentAttempt.js'
 import Product from '../models/Product.js'
 import { protect, optionalAuth, adminOnly } from '../middleware/auth.js'
 import { sendEmail, buildOrderReceiptEmail } from '../services/email.js'
+import { priceOrder } from '../services/orderPricing.js'
+import { PricingError } from '../services/pricing.js'
 import { processRefund } from '../services/refund.js'
 
 const router = Router()
@@ -13,9 +16,6 @@ const router = Router()
 const UDDOKTAPAY_API_KEY = process.env.UDDOKTAPAY_API_KEY || ''
 const UDDOKTAPAY_BASE_URL = process.env.UDDOKTAPAY_BASE_URL || 'https://sandbox.uddoktapay.com'
 const SITE_URL = process.env.SITE_URL || 'https://fleetmartbd.vercel.app'
-
-const PARTIAL_PAYMENT_AMOUNT = 300
-const CUSTOMIZATION_FEE = 250
 
 const isUddoktaPayConfigured = () => Boolean(UDDOKTAPAY_API_KEY)
 
@@ -34,48 +34,12 @@ const uddoktapayRequest = async (endpoint, body) => {
 const generateOrderId = () => `FM-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`
 const generateAttemptId = () => `PA-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`
 
-// ── Shared: server-side amount recalculation ──
-const recalculateAmounts = async (items, couponCode) => {
-  const productIds = items.map(i => i.product)
-  const dbProducts = await Product.find({ _id: { $in: productIds } })
-  const productMap = Object.fromEntries(dbProducts.map(p => [p._id.toString(), p]))
-
-  let subtotal = 0
-  const validatedItems = []
-  for (const i of items) {
-    const dbProduct = productMap[i.product]
-    if (!dbProduct) {
-      continue
-    }
-    const basePrice = dbProduct.price
-    const hasCustomization = i.customization && (i.customization.name || i.customization.number)
-    const unitPrice = hasCustomization ? basePrice + CUSTOMIZATION_FEE : basePrice
-    const qty = Math.max(1, Math.floor(Number(i.qty) || 1))
-    subtotal += unitPrice * qty
-    validatedItems.push({ ...i, price: unitPrice, qty })
-  }
-
-  const shippingFee = subtotal >= 3000 ? 0 : 80
-  let discount = 0
-  if (couponCode) {
-    const Coupon = (await import('../models/Coupon.js')).default
-    const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true })
-    if (coupon && (!coupon.expiresAt || coupon.expiresAt > new Date()) && (coupon.maxUses <= 0 || coupon.usedCount < coupon.maxUses) && subtotal >= coupon.minOrder) {
-      discount = coupon.discountType === 'percent' ? Math.round(subtotal * coupon.value / 100) : Math.min(coupon.value, subtotal)
-      await Coupon.updateOne({ _id: coupon._id }, { $inc: { usedCount: 1 } })
-    }
-  }
-  // Online payable total excludes delivery — delivery is paid separately to delivery man
-  const grand = Math.max(0, subtotal - discount)
-  return { validatedItems, subtotal, shippingFee, discount, grand }
-}
-
 // POST /api/payment/initiate — create payment attempt + redirect to UddoktaPay
 router.post('/initiate', optionalAuth, async (req, res, next) => {
   try {
     const { items, shipping, paymentType, couponCode, note, guestInfo } = req.body
 
-    if (!items || items.length === 0) {
+    if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'Order must contain at least one item' })
     }
 
@@ -91,23 +55,29 @@ router.post('/initiate', optionalAuth, async (req, res, next) => {
       return res.status(400).json({ message: 'Invalid payment type. Choose partial or full.' })
     }
 
-    // ── Server-side amount recalculation (never trust client totals) ──
-    const { validatedItems, subtotal, shippingFee, discount, grand } = await recalculateAmounts(items, couponCode)
-    const amountToPay = paymentType === 'partial' ? Math.min(PARTIAL_PAYMENT_AMOUNT, grand) : grand
+    const pricing = await priceOrder({ items, couponCode, paymentType })
+    const {
+      validatedItems,
+      subtotal,
+      shippingFee,
+      discount,
+      total,
+      amountToPay,
+      couponId,
+      couponCode: appliedCouponCode,
+    } = pricing
+
+    if (couponId) {
+      await Coupon.updateOne({ _id: couponId }, { $inc: { usedCount: 1 } })
+    }
+
     const attemptId = generateAttemptId()
 
     const attempt = await PaymentAttempt.create({
       attemptId,
       user: user?._id || null,
       guestEmail,
-      items: validatedItems.map(i => ({
-        product: i.product,
-        name: i.name,
-        size: i.size,
-        qty: i.qty,
-        price: i.price,
-        customization: i.customization || null,
-      })),
+      items: validatedItems,
       shippingAddress: {
         label: 'Delivery',
         name: shipping?.name || guestName || '',
@@ -122,9 +92,9 @@ router.post('/initiate', optionalAuth, async (req, res, next) => {
       subtotal,
       shippingFee,
       discount,
-      total: grand,
+      total,
       amountToPay,
-      couponCode: couponCode || null,
+      couponCode: appliedCouponCode,
       note: note || '',
       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
     })
@@ -171,7 +141,12 @@ router.post('/initiate', optionalAuth, async (req, res, next) => {
       const msg = gatewayErr.response?.data?.message || 'Payment gateway error. Please try again.'
       return res.status(500).json({ message: msg, attemptId })
     }
-  } catch (err) { next(err) }
+  } catch (err) {
+    if (err instanceof PricingError) {
+      return res.status(err.status).json({ message: err.message })
+    }
+    next(err)
+  }
 })
 
 // POST /api/payment/success — UddoktaPay success callback (receives invoice_id via POST)

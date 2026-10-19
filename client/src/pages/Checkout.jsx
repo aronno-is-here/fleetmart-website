@@ -5,10 +5,10 @@ import { Check, ChevronRight, CreditCard, Truck, Wallet, ShoppingCart, Clock } f
 import { cartTotal, clearCart } from '../features/cartSlice'
 import { toast } from '../features/uiSlice'
 import { fmt } from '../lib/format'
+import { calculateAmountToPay, calculateOnlineTotal } from '../lib/checkout'
 import api from '../lib/api'
 
 const STEPS = ['Address', 'Shipping', 'Payment', 'Review']
-const PARTIAL_PAYMENT_AMOUNT = 300
 
 export default function Checkout() {
   const dispatch = useDispatch()
@@ -18,10 +18,11 @@ export default function Checkout() {
   const items = useSelector((s) => s.cart)
   const total = useSelector(cartTotal)
   const passed = location.state || {}
-  const discount = passed.discount ?? 0
   const shipping = passed.shipping ?? (total >= 3000 ? 0 : 80)
-  const grand = passed.grand ?? total + shipping
 
+  const [discount, setDiscount] = useState(passed.discount ?? 0)
+  const [couponCode, setCouponCode] = useState(passed.couponCode || '')
+  const [couponChecking, setCouponChecking] = useState(Boolean(passed.couponCode))
   const [step, setStep] = useState(0)
   const [method, setMethod] = useState('uddoktapay')
   const [paymentType, setPaymentType] = useState('full')
@@ -58,11 +59,38 @@ export default function Checkout() {
     }
   }, [token, user])
 
-  const shipFee = ship === 'express' ? 150 : shipping
-  // Online payable total excludes delivery — delivery is paid separately to delivery man
-  const onlineTotal = total - discount
+  useEffect(() => {
+    if (!couponCode) {
+      setDiscount(0)
+      setCouponChecking(false)
+      return
+    }
+
+    let cancelled = false
+    setCouponChecking(true)
+
+    api.post('/coupons/validate', { code: couponCode, subtotal: total })
+      .then(({ data }) => {
+        if (cancelled) return
+        setDiscount(data.discount || 0)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setDiscount(0)
+        setCouponCode('')
+        dispatch(toast({ type: 'error', message: 'Coupon is no longer valid and was removed.' }))
+      })
+      .finally(() => {
+        if (!cancelled) setCouponChecking(false)
+      })
+
+    return () => { cancelled = true }
+  }, [couponCode, total, dispatch])
+
+  const onlineTotal = calculateOnlineTotal(total, discount)
   const finalTotal = onlineTotal
-  const amountToPay = paymentType === 'partial' ? PARTIAL_PAYMENT_AMOUNT : finalTotal
+  const partialNow = calculateAmountToPay('partial', onlineTotal)
+  const amountToPay = calculateAmountToPay(paymentType, onlineTotal)
 
   const canNext = () => {
     if (step === 0) {
@@ -73,15 +101,17 @@ export default function Checkout() {
   }
 
   const placeOrder = async () => {
+    if (couponChecking) {
+      dispatch(toast({ type: 'info', message: 'Checking coupon, please try again.' }))
+      return
+    }
     setPlacing(true)
     try {
       const { data } = await api.post('/payment/initiate', {
         items: items.map((i) => ({
           product: i.id,
-          name: i.name,
           size: i.size,
           qty: i.qty,
-          price: i.price,
           customization: i.customization || null,
         })),
         shipping: {
@@ -95,8 +125,7 @@ export default function Checkout() {
         },
         paymentType,
         shippingMethod: ship,
-        couponCode: passed.couponCode || '',
-        totals: { subtotal: total, discount, shipping: shipFee, grand: finalTotal },
+        couponCode,
         note: addr.note || '',
         guestInfo: !token ? { name: addr.name, email: addr.email, phone: addr.phone } : undefined,
       })
@@ -124,8 +153,8 @@ export default function Checkout() {
           <p className="mt-3 text-muted">Order <span className="font-semibold text-volt">#{orderId || 'FM-PENDING'}</span> is confirmed. A tracking link is on its way to your inbox.</p>
           {paymentType === 'partial' && (
             <div className="mt-4 border border-line bg-pitch p-4 text-sm">
-              <p className="text-chalk">Amount paid: <span className="text-volt">{fmt(PARTIAL_PAYMENT_AMOUNT)}</span></p>
-              <p className="text-muted">Remaining: {fmt(finalTotal - PARTIAL_PAYMENT_AMOUNT)} (to be paid on delivery)</p>
+              <p className="text-chalk">Amount paid: <span className="text-volt">{fmt(amountToPay)}</span></p>
+              <p className="text-muted">Remaining: {fmt(finalTotal - amountToPay)} (to be paid on delivery)</p>
               <p className="text-xs text-muted mt-1">Delivery charge (৳80–130) is paid separately to the delivery man.</p>
             </div>
           )}
@@ -231,7 +260,7 @@ export default function Checkout() {
               <div className="space-y-3">
                 <p className="font-head text-sm font-semibold uppercase tracking-widest text-chalk">Payment Type</p>
                 {[
-                  { id: 'partial', title: `Partial Payment — ${fmt(PARTIAL_PAYMENT_AMOUNT)}`, sub: `Pay ${fmt(PARTIAL_PAYMENT_AMOUNT)} now via bKash/Nagad, rest on delivery`, amount: PARTIAL_PAYMENT_AMOUNT },
+                  { id: 'partial', title: `Partial Payment — ${fmt(partialNow)}`, sub: `Pay ${fmt(partialNow)} now via bKash/Nagad, rest on delivery`, amount: partialNow },
                   { id: 'full', title: `Full Payment — ${fmt(finalTotal)}`, sub: 'Pay the full amount now via bKash/Nagad', amount: finalTotal },
                 ].map((o) => (
                   <button key={o.id} onClick={() => setPaymentType(o.id)} className={`flex w-full items-center gap-4 border p-4 text-left transition-colors ${paymentType === o.id ? 'border-volt bg-volt/5' : 'border-line hover:border-volt/50'}`}>
@@ -268,8 +297,8 @@ export default function Checkout() {
               </div>
               {paymentType === 'partial' && (
                 <div className="border border-volt/30 bg-volt/5 p-4 text-sm">
-                  <p className="text-chalk">Now: <span className="text-volt font-semibold">{fmt(300)}</span></p>
-                  <p className="text-muted">Remaining on delivery: {fmt(finalTotal - 300)}</p>
+                  <p className="text-chalk">Now: <span className="text-volt font-semibold">{fmt(amountToPay)}</span></p>
+                  <p className="text-muted">Remaining on delivery: {fmt(finalTotal - amountToPay)}</p>
                 </div>
               )}
             </div>
@@ -282,8 +311,8 @@ export default function Checkout() {
                 Continue <ChevronRight size={15} />
               </button>
             ) : (
-              <button onClick={placeOrder} disabled={placing} className="btn-volt !py-2.5 !text-xs">
-                {placing ? 'Processing…' : `Pay ${fmt(amountToPay)}`}
+              <button onClick={placeOrder} disabled={placing || couponChecking} className="btn-volt !py-2.5 !text-xs">
+                {placing ? 'Processing…' : couponChecking ? 'Checking coupon…' : `Pay ${fmt(amountToPay)}`}
               </button>
             )}
           </div>
@@ -301,7 +330,7 @@ export default function Checkout() {
             {paymentType === 'partial' && (
               <div className="flex justify-between border-t border-line pt-3">
                 <dt className="font-head text-xs uppercase tracking-widest text-muted">Pay Now</dt>
-                <dd className="font-head text-lg font-semibold text-volt">{fmt(PARTIAL_PAYMENT_AMOUNT)}</dd>
+                <dd className="font-head text-lg font-semibold text-volt">{fmt(amountToPay)}</dd>
               </div>
             )}
           </dl>

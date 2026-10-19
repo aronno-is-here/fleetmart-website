@@ -5,12 +5,13 @@ import Product from '../models/Product.js'
 import Coupon from '../models/Coupon.js'
 import { protect, adminOnly } from '../middleware/auth.js'
 import { sendEmail } from '../services/email.js'
+import { priceOrder } from '../services/orderPricing.js'
+import { PricingError } from '../services/pricing.js'
 import { escapeRegex, escapeHtml } from '../utils/sanitize.js'
 import { processRefund } from '../services/refund.js'
 
 const UDDOKTAPAY_API_KEY = process.env.UDDOKTAPAY_API_KEY || ''
 const UDDOKTAPAY_BASE_URL = process.env.UDDOKTAPAY_BASE_URL || 'https://sandbox.uddoktapay.com'
-const CUSTOMIZATION_FEE = 250
 
 const isUddoktaPayConfigured = () => Boolean(UDDOKTAPAY_API_KEY)
 
@@ -172,46 +173,24 @@ router.post('/', protect, async (req, res, next) => {
       return res.status(400).json({ message: 'Invalid payment method' })
     }
 
-    // ── Server-side amount recalculation (never trust client totals) ──
-    const productIds = items.map(i => i.product).filter(Boolean)
-    const dbProducts = await Product.find({ _id: { $in: productIds } })
-    const productMap = Object.fromEntries(dbProducts.map(p => [p._id.toString(), p]))
-
-    let subtotal = 0
-    const validatedItems = []
-    for (const i of items) {
-      const dbProduct = productMap[i.product]
-      if (!dbProduct) continue
-      const basePrice = dbProduct.price
-      const hasCustomization = i.customization && (i.customization.name || i.customization.number)
-      const unitPrice = hasCustomization ? basePrice + CUSTOMIZATION_FEE : basePrice
-      const qty = Math.max(1, Math.floor(Number(i.qty) || 1))
-      subtotal += unitPrice * qty
-      validatedItems.push({
-        product: i.product,
-        name: i.name,
-        size: i.size,
-        qty,
-        price: unitPrice,
-        customization: i.customization || (i.artColors ? { name: i.artColors.name || '', number: i.artColors.number || '' } : undefined),
-      })
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: 'Order must contain at least one item' })
     }
 
-    if (validatedItems.length === 0) {
-      return res.status(400).json({ message: 'No valid items found' })
-    }
+    const pricing = await priceOrder({ items, couponCode, paymentType: 'full' })
+    const {
+      validatedItems,
+      subtotal,
+      shippingFee,
+      discount,
+      total: grand,
+      couponId,
+      couponCode: appliedCouponCode,
+    } = pricing
 
-    const shippingFee = subtotal >= 3000 ? 0 : 80
-    let discount = 0
-    if (couponCode) {
-      const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true })
-      if (coupon && (!coupon.expiresAt || coupon.expiresAt > new Date()) && (coupon.maxUses <= 0 || coupon.usedCount < coupon.maxUses) && subtotal >= coupon.minOrder) {
-        discount = coupon.discountType === 'percent' ? Math.round(subtotal * coupon.value / 100) : Math.min(coupon.value, subtotal)
-        await Coupon.updateOne({ _id: coupon._id }, { $inc: { usedCount: 1 } })
-      }
+    if (couponId) {
+      await Coupon.updateOne({ _id: couponId }, { $inc: { usedCount: 1 } })
     }
-    // Online payable total excludes delivery — delivery is paid separately to delivery man
-    const grand = Math.max(0, subtotal - discount)
 
     const crypto = await import('crypto')
     const orderId = `FM-${Date.now().toString(36).toUpperCase()}-${crypto.default.randomBytes(3).toString('hex').toUpperCase()}`
@@ -238,7 +217,7 @@ router.post('/', protect, async (req, res, next) => {
       shippingFee,
       discount,
       total: grand,
-      couponCode: couponCode || null,
+      couponCode: appliedCouponCode,
       note: note || '',
       statusHistory: [{ status: 'processing', timestamp: new Date() }],
       paymentStatus: 'pending',
@@ -257,7 +236,12 @@ router.post('/', protect, async (req, res, next) => {
     }
 
     res.status(201).json({ order, orderId: order.orderId })
-  } catch (err) { next(err) }
+  } catch (err) {
+    if (err instanceof PricingError) {
+      return res.status(err.status).json({ message: err.message })
+    }
+    next(err)
+  }
 })
 
 export default router

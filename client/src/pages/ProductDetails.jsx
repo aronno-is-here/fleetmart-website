@@ -123,7 +123,9 @@ export default function ProductDetails() {
 
   const price = discounted(product)
   const pct = discountPct(product)
-  const isCustomizing = product.customizable && (custom.name.trim() || custom.number.trim())
+  const hasCustomName = Boolean(custom.name.trim())
+  const hasCustomNumber = Boolean(custom.number.trim())
+  const isCustomizing = product.customizable && hasCustomName && hasCustomNumber
   const unitPrice = price + (isCustomizing ? CUSTOM_FEE : 0)
   const sizeStock = size != null ? product.stock[size] : null
 
@@ -141,6 +143,11 @@ export default function ProductDetails() {
     : { ...product.artColors, number: custom.number || '10', name: (custom.name || 'FLEET').toUpperCase(), view: viewName }
 
   const addNow = (buyNow = false) => {
+    if (product.customizable && hasCustomName !== hasCustomNumber) {
+      dispatch(toast({ type: 'error', message: 'Enter both player name and number, or leave both blank.' }))
+      return
+    }
+
     const chosen = size || Object.keys(product.stock).find((s) => product.stock[s] > 0)
     if (!chosen) {
       dispatch(toast({ type: 'error', message: 'Out of stock' }))
@@ -150,7 +157,7 @@ export default function ProductDetails() {
       addToCart({
         id: product._id, slug: product.slug, name: product.name,
         price: unitPrice, art: product.artColors || null, size: chosen, qty,
-        customization: isCustomizing ? { name: custom.name.toUpperCase().slice(0, 12), number: custom.number.slice(0, 2) } : null,
+        customization: isCustomizing ? { name: custom.name.trim().toUpperCase().slice(0, 12), number: custom.number.trim().slice(0, 2) } : null,
       })
     )
     dispatch(toast({ type: 'success', message: `${product.name} · ${chosen} added to bag` }))

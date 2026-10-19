@@ -1,30 +1,40 @@
 import { Router } from 'express'
 import Coupon from '../models/Coupon.js'
 import { protect, adminOnly } from '../middleware/auth.js'
+import { evaluateCoupon, normalizeCouponCode } from '../services/pricing.js'
 
 const router = Router()
 
 // POST /api/coupons/validate — public (apply coupon)
 router.post('/validate', async (req, res, next) => {
   try {
-    const { code, subtotal } = req.body
-    const coupon = await Coupon.findOne({ code: code.toUpperCase(), isActive: true })
+    const normalizedCode = normalizeCouponCode(req.body?.code)
+    const rawSubtotal = req.body?.subtotal
+    const subtotal = Number(rawSubtotal)
+
+    if (!normalizedCode) {
+      return res.status(400).json({ message: 'Coupon code is required' })
+    }
+    if (rawSubtotal === undefined || rawSubtotal === null || rawSubtotal === '' || !Number.isFinite(subtotal) || subtotal < 0) {
+      return res.status(400).json({ message: 'Valid subtotal is required' })
+    }
+
+    const coupon = await Coupon.findOne({ code: normalizedCode, isActive: true })
     if (!coupon) return res.status(404).json({ message: 'Invalid coupon code' })
-    if (coupon.expiresAt && coupon.expiresAt < new Date()) {
-      return res.status(400).json({ message: 'Coupon expired' })
-    }
-    if (coupon.maxUses > 0 && coupon.usedCount >= coupon.maxUses) {
-      return res.status(400).json({ message: 'Coupon usage limit reached' })
-    }
-    if (subtotal < coupon.minOrder) {
-      return res.status(400).json({ message: `Minimum order ৳${coupon.minOrder} required` })
+
+    const result = evaluateCoupon(coupon, subtotal)
+    if (!result.ok) {
+      return res.status(400).json({ message: result.message })
     }
 
-    const discount = coupon.discountType === 'percent'
-      ? Math.round(subtotal * coupon.value / 100)
-      : coupon.value
-
-    res.json({ coupon: { code: coupon.code, discountType: coupon.discountType, value: coupon.value, discount } })
+    res.json({
+      coupon: {
+        code: coupon.code,
+        discountType: coupon.discountType,
+        value: coupon.value,
+        discount: result.discount,
+      },
+    })
   } catch (err) { next(err) }
 })
 

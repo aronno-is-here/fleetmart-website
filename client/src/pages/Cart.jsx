@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { Trash2, Plus, Minus, Tag, X, ArrowRight } from 'lucide-react'
 import { removeFromCart, setQty, cartTotal } from '../features/cartSlice'
 import { toast } from '../features/uiSlice'
 import { fmt } from '../lib/format'
+import { FREE_SHIPPING_THRESHOLD, STANDARD_SHIPPING_FEE } from '../lib/checkout'
 import api from '../lib/api'
 
 export default function Cart() {
@@ -15,9 +16,27 @@ export default function Cart() {
   const [applied, setApplied] = useState(null) // { code, discount }
   const [validating, setValidating] = useState(false)
 
+  useEffect(() => {
+    const code = applied?.code
+    if (!code) return
+
+    let cancelled = false
+    api.post('/coupons/validate', { code, subtotal: total })
+      .then(({ data }) => {
+        if (!cancelled) setApplied({ code, discount: data.discount || 0 })
+      })
+      .catch(() => {
+        if (cancelled) return
+        setApplied(null)
+        dispatch(toast({ type: 'error', message: 'Coupon is no longer valid and was removed.' }))
+      })
+
+    return () => { cancelled = true }
+  }, [total, applied?.code, dispatch])
+
   const discount = applied ? applied.discount : 0
-  const shipping = total >= 3000 || total === 0 ? 0 : 80
-  const grand = total - discount + shipping
+  const shipping = total >= FREE_SHIPPING_THRESHOLD || total === 0 ? 0 : STANDARD_SHIPPING_FEE
+  const grand = Math.max(0, total - discount)
 
   const applyCoupon = async () => {
     const c = code.trim().toUpperCase()
@@ -104,14 +123,14 @@ export default function Cart() {
           <dl className="mt-6 space-y-3 border-t border-line pt-5 text-sm">
             <div className="flex justify-between"><dt className="text-muted">Subtotal</dt><dd className="text-chalk">{fmt(total)}</dd></div>
             {discount > 0 && <div className="flex justify-between"><dt className="text-muted">Coupon discount</dt><dd className="text-volt">−{fmt(discount)}</dd></div>}
-            <div className="flex justify-between"><dt className="text-muted">Delivery</dt><dd className="text-chalk">{shipping === 0 ? <span className="text-volt">FREE</span> : fmt(shipping)}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">Delivery <span className="text-[10px] uppercase tracking-wider">(paid separately)</span></dt><dd className="text-chalk">{shipping === 0 ? <span className="text-volt">FREE</span> : fmt(shipping)}</dd></div>
             <div className="flex justify-between border-t border-line pt-3 text-base">
-              <dt className="font-head font-semibold uppercase tracking-widest text-chalk">Total</dt>
+              <dt className="font-head font-semibold uppercase tracking-widest text-chalk">Online Total</dt>
               <dd className="font-head text-xl font-semibold text-volt">{fmt(grand)}</dd>
             </div>
           </dl>
 
-          <Link to="/checkout" state={{ discount, shipping, grand }} className="btn-volt mt-6 w-full justify-center">Proceed to Checkout</Link>
+          <Link to="/checkout" state={{ discount, shipping, couponCode: applied?.code || '' }} className="btn-volt mt-6 w-full justify-center">Proceed to Checkout</Link>
           <Link to="/shop" className="mt-3 block text-center text-xs uppercase tracking-widest text-muted hover:text-volt">Continue shopping</Link>
         </aside>
       </div>
