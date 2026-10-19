@@ -171,10 +171,10 @@ test('initiate applies a valid customization fee and server-side coupon', async 
   assert.equal(attempt.total, 2070)
   assert.equal(attempt.amountToPay, 2070)
   assert.equal(attempt.couponCode, 'SAVE10')
+  assert.equal(attempt.couponId, coupon._id)
   assert.equal(attempt.items[0].price, 1150)
   assert.deepEqual(attempt.items[0].customization, { name: 'TAMIM', number: '10' })
-  assert.equal(couponCalls.length, 1)
-  assert.equal(couponCalls[0].filter._id, coupon._id)
+  assert.equal(couponCalls.length, 0)
 })
 
 test('initiate caps partial payment at the online payable total below 300', async (t) => {

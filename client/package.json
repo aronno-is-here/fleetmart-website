@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "test": "node --test src/lib/checkout.test.js",
+    "test": "node --test src/lib/checkout.test.js src/lib/cart.test.js src/lib/order.test.js",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useLocation, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { Check, ChevronRight, CreditCard, Truck, Wallet, ShoppingCart, Clock } from 'lucide-react'
-import { cartTotal, clearCart } from '../features/cartSlice'
+import { cartTotal } from '../features/cartSlice'
 import { toast } from '../features/uiSlice'
 import { fmt } from '../lib/format'
 import { calculateAmountToPay, calculateOnlineTotal } from '../lib/checkout'
@@ -45,6 +45,8 @@ export default function Checkout() {
       dispatch(toast({ type: 'info', message: 'Payment was cancelled.' }))
     } else if (paymentStatus === 'expired') {
       dispatch(toast({ type: 'error', message: 'Payment session expired. Please try again.' }))
+    } else if (paymentStatus === 'pending') {
+      dispatch(toast({ type: 'info', message: 'Payment status is pending. We are verifying it and will confirm your order shortly.' }))
     }
   }, [paymentStatus, dispatch])
 

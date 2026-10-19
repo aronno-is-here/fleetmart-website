@@ -1,37 +1,22 @@
 import { Router } from 'express'
 import crypto from 'crypto'
-import axios from 'axios'
-import Coupon from '../models/Coupon.js'
 import Order from '../models/Order.js'
 import PaymentAttempt from '../models/PaymentAttempt.js'
-import Product from '../models/Product.js'
 import { protect, optionalAuth, adminOnly } from '../middleware/auth.js'
-import { sendEmail, buildOrderReceiptEmail } from '../services/email.js'
 import { priceOrder } from '../services/orderPricing.js'
 import { PricingError } from '../services/pricing.js'
 import { processRefund } from '../services/refund.js'
+import { processInvoice } from '../services/paymentFulfillment.js'
+import {
+  isUddoktaPayConfigured,
+  isValidWebhookKey,
+  uddoktapayRequest,
+} from '../services/uddoktapay.js'
 
 const router = Router()
 
-const UDDOKTAPAY_API_KEY = process.env.UDDOKTAPAY_API_KEY || ''
-const UDDOKTAPAY_BASE_URL = process.env.UDDOKTAPAY_BASE_URL || 'https://sandbox.uddoktapay.com'
 const SITE_URL = process.env.SITE_URL || 'https://fleetmartbd.vercel.app'
 
-const isUddoktaPayConfigured = () => Boolean(UDDOKTAPAY_API_KEY)
-
-const uddoktapayRequest = async (endpoint, body) => {
-  const response = await axios.post(`${UDDOKTAPAY_BASE_URL}${endpoint}`, body, {
-    headers: {
-      'RT-UDDOKTAPAY-API-KEY': UDDOKTAPAY_API_KEY,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    timeout: 30000,
-  })
-  return response.data
-}
-
-const generateOrderId = () => `FM-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`
 const generateAttemptId = () => `PA-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`
 
 // POST /api/payment/initiate — create payment attempt + redirect to UddoktaPay
@@ -67,10 +52,6 @@ router.post('/initiate', optionalAuth, async (req, res, next) => {
       couponCode: appliedCouponCode,
     } = pricing
 
-    if (couponId) {
-      await Coupon.updateOne({ _id: couponId }, { $inc: { usedCount: 1 } })
-    }
-
     const attemptId = generateAttemptId()
 
     const attempt = await PaymentAttempt.create({
@@ -95,6 +76,7 @@ router.post('/initiate', optionalAuth, async (req, res, next) => {
       total,
       amountToPay,
       couponCode: appliedCouponCode,
+      couponId,
       note: note || '',
       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
     })
@@ -149,10 +131,24 @@ router.post('/initiate', optionalAuth, async (req, res, next) => {
   }
 })
 
+const attemptQuery = (attemptId) => (attemptId ? `&attemptId=${encodeURIComponent(attemptId)}` : '')
+
+const redirectPaymentResult = (res, result = {}) => {
+  if ((result.status === 'completed' || result.status === 'already_completed') && result.orderId) {
+    return res.redirect(`${SITE_URL}/order/success?orderId=${encodeURIComponent(result.orderId)}`)
+  }
+
+  if (result.status === 'pending') {
+    return res.redirect(`${SITE_URL}/checkout?payment=pending${attemptQuery(result.attemptId)}`)
+  }
+
+  return res.redirect(`${SITE_URL}/checkout?payment=failed${attemptQuery(result.attemptId)}`)
+}
+
 // POST /api/payment/success — UddoktaPay success callback (receives invoice_id via POST)
 router.post('/success', async (req, res, next) => {
   try {
-    const { invoice_id } = req.body
+    const { invoice_id } = req.body || {}
 
     if (!invoice_id) {
       return res.redirect(`${SITE_URL}/checkout?payment=error`)
@@ -162,147 +158,40 @@ router.post('/success', async (req, res, next) => {
       return res.redirect(`${SITE_URL}/checkout?payment=error`)
     }
 
-    // ── Verify payment with UddoktaPay ──
-    let verification
+    let result
     try {
-      verification = await uddoktapayRequest('/verify-payment', { invoice_id })
+      result = await processInvoice(invoice_id)
     } catch {
-      return res.redirect(`${SITE_URL}/checkout?payment=error`)
+      const attempt = await PaymentAttempt.findOne({ invoiceId: invoice_id }).catch(() => null)
+      return res.redirect(`${SITE_URL}/checkout?payment=pending${attemptQuery(attempt?.attemptId)}`)
     }
 
-    if (verification.status !== 'COMPLETED') {
-      return res.redirect(`${SITE_URL}/checkout?payment=failed`)
-    }
-
-    // ── Find the payment attempt by attemptId from metadata ──
-    let metadata
-    try {
-      metadata = typeof verification.metadata === 'string' ? JSON.parse(verification.metadata) : verification.metadata
-    } catch {
-      return res.redirect(`${SITE_URL}/checkout?payment=error`)
-    }
-    const attemptId = metadata?.attemptId
-
-    if (!attemptId) {
-      return res.redirect(`${SITE_URL}/checkout?payment=error`)
-    }
-
-    const attempt = await PaymentAttempt.findOne({ attemptId, status: { $in: ['pending', 'processing'] } })
-    if (!attempt) {
-      // Check if already processed (idempotent)
-      const existing = await PaymentAttempt.findOne({ attemptId, status: 'completed' })
-      if (existing?.orderId) {
-        return res.redirect(`${SITE_URL}/order/success?orderId=${existing.orderId}`)
-      }
-      return res.redirect(`${SITE_URL}/checkout?payment=expired`)
-    }
-
-    if (new Date() > attempt.expiresAt) {
-      attempt.status = 'expired'
-      await attempt.save()
-      return res.redirect(`${SITE_URL}/checkout?payment=expired`)
-    }
-
-    // ── Verify amount matches (prevent tampering) ──
-    const verifiedAmount = parseFloat(verification.amount)
-    if (Math.abs(verifiedAmount - attempt.amountToPay) > 0.01) {
-      attempt.status = 'failed'
-      await attempt.save()
-      return res.redirect(`${SITE_URL}/checkout?payment=failed`)
-    }
-
-    // ── Mark attempt as completed ──
-    attempt.status = 'completed'
-    attempt.invoiceId = invoice_id
-    attempt.completedAt = new Date()
-    await attempt.save()
-
-    // ── Create Order ──
-    const orderId = generateOrderId()
-    const amountPaid = attempt.amountToPay
-    const remainingAmount = attempt.paymentType === 'partial' ? attempt.total - amountPaid : 0
-
-    const order = await Order.create({
-      orderId,
-      user: attempt.user || null,
-      guestEmail: attempt.guestEmail || null,
-      guestName: attempt.shippingAddress?.name || null,
-      guestPhone: attempt.shippingAddress?.phone || null,
-      items: attempt.items,
-      shippingAddress: attempt.shippingAddress,
-      paymentMethod: 'uddoktapay',
-      paymentGatewayMethod: verification.payment_method || null,
-      paymentType: attempt.paymentType,
-      amountPaid,
-      remainingAmount,
-      paymentStatus: attempt.paymentType === 'partial' ? 'partial' : 'paid',
-      orderStatus: 'confirmed',
-      subtotal: attempt.subtotal,
-      shippingFee: attempt.shippingFee,
-      discount: attempt.discount,
-      total: attempt.total,
-      couponCode: attempt.couponCode,
-      note: attempt.note,
-      transactionId: verification.transaction_id || invoice_id,
-      paymentAttemptId: attempt.attemptId,
-      paymentVerifiedAt: new Date(),
-      statusHistory: [
-        { status: 'pending', timestamp: new Date() },
-        { status: 'confirmed', timestamp: new Date() },
-      ],
-    })
-
-    // ── Atomic stock deduction ──
-    const stockIssues = []
-    for (const item of attempt.items) {
-      if (item.product && item.size) {
-        const result = await Product.updateOne(
-          { _id: item.product, [`stock.${item.size}`]: { $gte: item.qty } },
-          { $inc: { [`stock.${item.size}`]: -item.qty } }
-        ).catch((err) => {
-          console.error(`[STOCK] Deduction failed | Product: ${item.product} | Size: ${item.size} | Error: ${err.message}`)
-          return { modifiedCount: 0 }
-        })
-        if (result.modifiedCount === 0) {
-          console.warn(`[STOCK] Insufficient stock or not found | Product: ${item.product} | Size: ${item.size} | Qty: ${item.qty}`)
-          stockIssues.push(`${item.name} (${item.size})`)
-        }
-      }
-    }
-
-    // Flag order if stock deduction failed — admin must reconcile
-    if (stockIssues.length > 0) {
-      const stockNote = `STOCK ISSUE: Failed to deduct stock for: ${stockIssues.join(', ')}. Manual reconciliation required.`
-      order.note = order.note ? `${order.note}\n${stockNote}` : stockNote
-      order.statusHistory.push({ status: order.orderStatus, timestamp: new Date(), note: stockNote })
-      await order.save()
-    }
-
-    attempt.orderId = orderId
-    await attempt.save()
-
-    // ── Send receipt email ──
-    const receiptHtml = buildOrderReceiptEmail(order)
-    const recipientEmail = order.user?.email || order.guestEmail
-    if (recipientEmail) {
-      sendEmail(recipientEmail, `FleetMart Order Confirmation — #${orderId}`, receiptHtml)
-        .catch((err) => console.error(`[EMAIL] Receipt failed | Order: ${orderId} | Error: ${err.message}`))
-    }
-
-    res.redirect(`${SITE_URL}/order/success?orderId=${orderId}`)
+    return redirectPaymentResult(res, result)
   } catch (err) { next(err) }
 })
 
 // POST /api/payment/cancel — UddoktaPay cancel callback
 router.post('/cancel', async (req, res) => {
   try {
-    const { invoice_id } = req.body
+    const { invoice_id, metadata } = req.body || {}
+    let attempt = null
+
     if (invoice_id) {
-      const attempt = await PaymentAttempt.findOne({ invoiceId: invoice_id })
-      if (attempt) {
-        attempt.status = 'cancelled'
-        await attempt.save()
+      attempt = await PaymentAttempt.findOne({ invoiceId: invoice_id })
+    }
+
+    if (!attempt && metadata) {
+      let parsed = metadata
+      if (typeof parsed === 'string') {
+        try { parsed = JSON.parse(parsed) } catch { parsed = null }
       }
+      if (parsed?.attemptId) {
+        attempt = await PaymentAttempt.findOne({ attemptId: parsed.attemptId })
+      }
+    }
+
+    if (attempt && ['pending', 'processing'].includes(attempt.status)) {
+      await PaymentAttempt.updateOne({ attemptId: attempt.attemptId, status: { $in: ['pending', 'processing'] } }, { $set: { status: 'cancelled' } })
     }
   } catch { /* best effort */ }
   res.redirect(`${SITE_URL}/checkout?payment=cancelled`)
@@ -315,61 +204,28 @@ router.post('/ipn', async (req, res) => {
       return res.status(400).json({ message: 'Payment gateway not configured' })
     }
 
-    // ── Timing-safe API key validation ──
     const incomingKey = req.headers['rt-uddoktapay-api-key'] || ''
-    if (!incomingKey || incomingKey.length !== UDDOKTAPAY_API_KEY.length) {
-      return res.status(403).json({ message: 'Invalid API key' })
-    }
-    const keyBuffer = Buffer.from(incomingKey, 'utf8')
-    const expectedBuffer = Buffer.from(UDDOKTAPAY_API_KEY, 'utf8')
-    if (!crypto.timingSafeEqual(keyBuffer, expectedBuffer)) {
+    if (!isValidWebhookKey(incomingKey)) {
       return res.status(403).json({ message: 'Invalid API key' })
     }
 
-    // ── Read full webhook payload ──
-    const {
-      invoice_id,
-      full_name,
-      email,
-      amount,
-      fee,
-      charged_amount,
-      payment_method,
-      sender_number,
-      transaction_id,
-      date,
-      status: webhookStatus,
-      metadata: webhookMetadata,
-    } = req.body
-
+    const { invoice_id } = req.body || {}
     if (!invoice_id) {
       return res.status(400).json({ message: 'Invalid request' })
     }
 
-    // ── Server-side verification remains authoritative ──
-    const verification = await uddoktapayRequest('/verify-payment', { invoice_id })
-
-    if (verification.status === 'COMPLETED') {
-      let metadata
-      try {
-        metadata = typeof verification.metadata === 'string' ? JSON.parse(verification.metadata) : verification.metadata
-      } catch {
-        return res.json({ message: 'IPN received' })
-      }
-      const attemptId = metadata?.attemptId
-
-      if (attemptId) {
-        const attempt = await PaymentAttempt.findOne({ attemptId })
-        if (attempt?.orderId) {
-          return res.json({ message: 'Already processed' })
-        }
-
-        // Log webhook data for audit trail (no sensitive data)
-        console.log(`[IPN] Verified payment | Invoice: ${invoice_id} | Amount: ${amount} | Method: ${payment_method} | Txn: ${transaction_id}`)
-      }
+    let result
+    try {
+      result = await processInvoice(invoice_id)
+    } catch {
+      return res.status(500).json({ message: 'IPN processing failed' })
     }
 
-    res.json({ message: 'IPN received' })
+    if (result.status === 'completed' || result.status === 'already_completed') {
+      return res.json({ message: 'IPN processed', orderId: result.orderId })
+    }
+
+    return res.json({ message: 'IPN ignored', reason: result.code || result.status })
   } catch {
     res.status(500).json({ message: 'IPN processing failed' })
   }
@@ -394,7 +250,32 @@ router.get('/status/:attemptId', optionalAuth, async (req, res, next) => {
       amountToPay: attempt.amountToPay,
       total: attempt.total,
       expiresAt: attempt.expiresAt,
+      latePayment: attempt.latePayment,
+      paymentReceivedAt: attempt.paymentReceivedAt,
     })
+  } catch (err) { next(err) }
+})
+
+// POST /api/payment/reconcile/:attemptId — admin retry for a verified payment whose order creation failed
+router.post('/reconcile/:attemptId', protect, adminOnly, async (req, res, next) => {
+  try {
+    const attempt = await PaymentAttempt.findOne({ attemptId: req.params.attemptId })
+    if (!attempt) return res.status(404).json({ message: 'Payment attempt not found' })
+
+    if (attempt.status === 'completed' && attempt.orderId) {
+      return res.json({ message: 'Payment already reconciled', orderId: attempt.orderId })
+    }
+
+    if (!attempt.invoiceId) {
+      return res.status(400).json({ message: 'Payment has not been verified yet' })
+    }
+
+    const result = await processInvoice(attempt.invoiceId)
+    if (result.status === 'completed' || result.status === 'already_completed') {
+      return res.json({ message: 'Payment reconciled', orderId: result.orderId })
+    }
+
+    return res.status(409).json({ message: 'Reconciliation pending', status: result.status, reason: result.code })
   } catch (err) { next(err) }
 })
 

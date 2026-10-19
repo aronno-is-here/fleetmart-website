@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit'
+import { removePurchasedItemsFromCart } from '../lib/cart'
 
 const load = (key, fallback) => {
   try {
@@ -43,6 +44,11 @@ const cartSlice = createSlice({
       if (item) item.qty = Math.max(1, qty)
       save('fm_cart', state)
     },
+    removePurchasedItems(state, action) {
+      const remaining = removePurchasedItemsFromCart(state, action.payload)
+      save('fm_cart', remaining)
+      return remaining
+    },
     clearCart(state) {
       save('fm_cart', [])
       return []
@@ -50,7 +56,7 @@ const cartSlice = createSlice({
   },
 })
 
-export const { addToCart, removeFromCart, setQty, clearCart } = cartSlice.actions
+export const { addToCart, removeFromCart, setQty, removePurchasedItems, clearCart } = cartSlice.actions
 
 export const cartCount = (state) => state.cart.reduce((a, i) => a + i.qty, 0)
 export const cartTotal = (state) => state.cart.reduce((a, i) => a + i.qty * i.price, 0)

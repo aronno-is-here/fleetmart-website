@@ -1,31 +1,13 @@
 import { Router } from 'express'
-import axios from 'axios'
 import Order from '../models/Order.js'
 import Product from '../models/Product.js'
-import Coupon from '../models/Coupon.js'
 import { protect, adminOnly } from '../middleware/auth.js'
 import { sendEmail } from '../services/email.js'
 import { priceOrder } from '../services/orderPricing.js'
 import { PricingError } from '../services/pricing.js'
 import { escapeRegex, escapeHtml } from '../utils/sanitize.js'
 import { processRefund } from '../services/refund.js'
-
-const UDDOKTAPAY_API_KEY = process.env.UDDOKTAPAY_API_KEY || ''
-const UDDOKTAPAY_BASE_URL = process.env.UDDOKTAPAY_BASE_URL || 'https://sandbox.uddoktapay.com'
-
-const isUddoktaPayConfigured = () => Boolean(UDDOKTAPAY_API_KEY)
-
-const uddoktapayRequest = async (endpoint, body) => {
-  const response = await axios.post(`${UDDOKTAPAY_BASE_URL}${endpoint}`, body, {
-    headers: {
-      'RT-UDDOKTAPAY-API-KEY': UDDOKTAPAY_API_KEY,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    timeout: 30000,
-  })
-  return response.data
-}
+import { isUddoktaPayConfigured, uddoktapayRequest } from '../services/uddoktapay.js'
 
 const router = Router()
 
@@ -41,7 +23,7 @@ router.get('/my', protect, async (req, res, next) => {
 router.get('/lookup/:orderId', async (req, res, next) => {
   try {
     const order = await Order.findOne({ orderId: req.params.orderId })
-      .select('orderId orderStatus paymentStatus paymentMethod total createdAt')
+      .select('orderId orderStatus paymentStatus paymentMethod total createdAt items.product items.size items.qty items.customization')
     if (!order) return res.status(404).json({ message: 'Order not found' })
     res.json({ order })
   } catch (err) { next(err) }
@@ -188,10 +170,6 @@ router.post('/', protect, async (req, res, next) => {
       couponCode: appliedCouponCode,
     } = pricing
 
-    if (couponId) {
-      await Coupon.updateOne({ _id: couponId }, { $inc: { usedCount: 1 } })
-    }
-
     const crypto = await import('crypto')
     const orderId = `FM-${Date.now().toString(36).toUpperCase()}-${crypto.default.randomBytes(3).toString('hex').toUpperCase()}`
 
@@ -218,6 +196,7 @@ router.post('/', protect, async (req, res, next) => {
       discount,
       total: grand,
       couponCode: appliedCouponCode,
+      couponId,
       note: note || '',
       statusHistory: [{ status: 'processing', timestamp: new Date() }],
       paymentStatus: 'pending',

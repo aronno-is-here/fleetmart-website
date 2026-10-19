@@ -1,19 +1,30 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { useDispatch } from 'react-redux'
 import { CheckCircle2 } from 'lucide-react'
+import { removePurchasedItems } from '../features/cartSlice'
 import { fmt } from '../lib/format'
+import { shouldClearPurchasedCart } from '../lib/order'
 import api from '../lib/api'
 
 export default function OrderSuccess() {
+  const dispatch = useDispatch()
   const [searchParams] = useSearchParams()
   const orderId = searchParams.get('orderId')
   const [order, setOrder] = useState(null)
 
   useEffect(() => {
-    if (orderId) {
-      api.get(`/orders/lookup/${orderId}`).then(({ data }) => setOrder(data.order)).catch(() => {})
-    }
-  }, [orderId])
+    if (!orderId) return
+
+    api.get(`/orders/lookup/${orderId}`)
+      .then(({ data }) => {
+        setOrder(data.order)
+        if (shouldClearPurchasedCart(data.order)) {
+          dispatch(removePurchasedItems(data.order.items || []))
+        }
+      })
+      .catch(() => {})
+  }, [orderId, dispatch])
 
   return (
     <div className="container-fm grid place-items-center py-24 text-center">

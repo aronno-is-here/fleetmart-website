@@ -51,15 +51,26 @@ const orderSchema = new mongoose.Schema({
   discount: { type: Number, default: 0 },
   total: { type: Number, required: true },
   couponCode: { type: String, default: null },
+  couponId: { type: mongoose.Schema.Types.ObjectId, ref: 'Coupon', default: null },
   note: { type: String, default: '' },
-  transactionId: { type: String, default: null, sparse: true },
-  paymentAttemptId: { type: String, default: null, sparse: true },
+  transactionId: { type: String, default: null },
+  paymentAttemptId: { type: String, default: null },
   paymentVerifiedAt: { type: Date, default: null },
+  latePayment: { type: Boolean, default: false },
+  stockProcessingAt: { type: Date, default: null },
+  stockDeductedAt: { type: Date, default: null },
+  stockIssues: [{ type: String }],
+  couponConsumptionStartedAt: { type: Date, default: null },
+  couponConsumedAt: { type: Date, default: null },
+  couponConsumptionStatus: { type: String, enum: ['consumed', 'limit_reached', 'failed', null], default: null },
+  receiptSendingAt: { type: Date, default: null },
+  receiptSentAt: { type: Date, default: null },
 }, { timestamps: true })
 
 orderSchema.index({ user: 1, createdAt: -1 })
 orderSchema.index({ orderStatus: 1 })
 orderSchema.index({ guestEmail: 1 })
 orderSchema.index({ transactionId: 1 }, { sparse: true })
+orderSchema.index({ paymentAttemptId: 1 }, { unique: true, partialFilterExpression: { paymentAttemptId: { $type: 'string' } } })
 
 export default mongoose.model('Order', orderSchema)
