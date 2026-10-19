@@ -6,6 +6,7 @@
     "dev": "node --watch server.js",
     "start": "node server.js",
     "seed": "node seed.js",
+    "backfill:taxonomy": "node scripts/backfillTaxonomy.js",
     "test": "node --test"
   },
   "dependencies": {

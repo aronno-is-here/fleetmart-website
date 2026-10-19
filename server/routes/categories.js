@@ -2,6 +2,12 @@ import { Router } from 'express'
 import Category from '../models/Category.js'
 import Product from '../models/Product.js'
 import { protect, adminOnly } from '../middleware/auth.js'
+import {
+  buildCategoryIndex,
+  getDescendants,
+  resolveCategoryPath,
+  sameStringArray,
+} from '../services/taxonomy.js'
 
 const router = Router()
 
@@ -37,40 +43,81 @@ async function autoGenerateBlurb(categoryId) {
   return ''
 }
 
-async function cascadePathUpdate(categoryId, newPath, newLevel) {
-  const children = await Category.find({ parent: categoryId })
-  for (const child of children) {
-    child.path = `${newPath}${categoryId}/`
-    child.level = newLevel + 1
-    await child.save()
-    await cascadePathUpdate(child._id, child.path, child.level)
-  }
+async function loadCategoryIndex() {
+  const categories = await Category.find()
+  return buildCategoryIndex(categories)
 }
 
-async function collectDescendantIds(categoryId) {
-  const children = await Category.find({ parent: categoryId }).select('_id')
-  let ids = children.map(c => c._id)
-  for (const child of children) {
-    const deeper = await collectDescendantIds(child._id)
-    ids = ids.concat(deeper)
+async function cascadePathUpdate(category) {
+  const index = await loadCategoryIndex()
+  const current = index.byObjectId.get(String(category._id))
+  if (!current) return
+
+  const byId = new Map([[String(current._id), current]])
+  const descendants = getDescendants(index, current)
+  for (const descendant of descendants) byId.set(String(descendant._id), descendant)
+
+  const ops = []
+  for (const descendant of descendants) {
+    const parent = byId.get(String(descendant.parent))
+    if (!parent) continue
+
+    descendant.path = `${parent.path}${parent._id}/`
+    descendant.level = parent.level + 1
+    ops.push({
+      updateOne: {
+        filter: { _id: descendant._id },
+        update: { $set: { path: descendant.path, level: descendant.level } },
+      },
+    })
   }
-  return ids
+
+  if (ops.length) await Category.bulkWrite(ops)
 }
 
-async function cascadeProductCategoryPath(categoryId) {
-  const descendantIds = await collectDescendantIds(categoryId)
-  const allIds = [categoryId, ...descendantIds]
-  if (allIds.length === 0) return
-  const products = await Product.find({ categoryPath: { $in: allIds } })
-  for (const p of products) {
-    const newPath = []
-    let current = await Category.findOne({ id: p.category })
-    while (current) {
-      newPath.unshift(current.id)
-      current = current.parent ? await Category.findById(current.parent) : null
+async function cascadeProductCategoryPath(category) {
+  const index = await loadCategoryIndex()
+  const current = index.byObjectId.get(String(category._id))
+  if (!current) return
+
+  const family = [current, ...getDescendants(index, current)]
+  const references = [...new Set(family.flatMap((item) => [item.id, String(item._id)]))]
+  const products = await Product.find({
+    $or: [
+      { category: { $in: references } },
+      { categoryPath: { $in: references } },
+    ],
+  })
+
+  const ops = []
+  for (const product of products) {
+    const resolved = resolveCategoryPath(index, product.category)
+    if (!resolved.ok) continue
+
+    if (product.category !== resolved.category.id || !sameStringArray(product.categoryPath, resolved.path)) {
+      ops.push({
+        updateOne: {
+          filter: { _id: product._id },
+          update: {
+            $set: {
+              category: resolved.category.id,
+              categoryPath: resolved.path,
+            },
+          },
+        },
+      })
     }
-    p.categoryPath = newPath
-    await p.save()
+  }
+
+  if (ops.length) await Product.bulkWrite(ops)
+}
+
+async function refreshParentBlurb(parentId) {
+  if (!parentId) return
+  const parent = await Category.findById(parentId)
+  if (parent?.autoBlurb) {
+    parent.blurb = await autoGenerateBlurb(parent._id)
+    await parent.save()
   }
 }
 
@@ -148,21 +195,26 @@ router.post('/', protect, adminOnly, async (req, res, next) => {
   try {
     const { name, blurb, autoBlurb, image, parent, displayOrder, isHero, isKitBuilder, isTurfInstallation } = req.body
 
-    if (!name) {
+    if (typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ message: 'Name is required' })
     }
 
-    const id = await generateUniqueSlug(name)
+    const id = await generateUniqueSlug(name.trim())
 
     let level = 0
     let path = '/'
     if (parent) {
-      const parentCat = await Category.findById(parent)
+      const parentCat = await Category.findById(parent).catch(() => null)
       if (!parentCat) {
         return res.status(400).json({ message: 'Parent category not found' })
       }
-      level = parentCat.level + 1
-      path = `${parentCat.path}${parentCat._id}/`
+      const index = await loadCategoryIndex()
+      const parentResolved = resolveCategoryPath(index, parentCat)
+      if (!parentResolved.ok) {
+        return res.status(400).json({ message: 'Parent category hierarchy is invalid or cyclic' })
+      }
+      level = parentResolved.level + 1
+      path = `${parentResolved.storedPath}${parentResolved.category._id}/`
     }
 
     const useAutoBlurb = autoBlurb !== false
@@ -172,7 +224,8 @@ router.post('/', protect, adminOnly, async (req, res, next) => {
     }
 
     const category = await Category.create({
-      id, name,
+      id,
+      name: name.trim(),
       blurb: finalBlurb,
       autoBlurb: useAutoBlurb,
       image: image || '',
@@ -188,6 +241,7 @@ router.post('/', protect, adminOnly, async (req, res, next) => {
       category.blurb = await autoGenerateBlurb(category._id)
       await category.save()
     }
+    await refreshParentBlurb(category.parent)
 
     res.status(201).json({ category })
   } catch (err) { next(err) }
@@ -200,12 +254,13 @@ router.put('/:id', protect, adminOnly, async (req, res, next) => {
     if (!category) return res.status(404).json({ message: 'Category not found' })
 
     const { name, blurb, autoBlurb, image, displayOrder, isActive, parent, isHero, isKitBuilder, isTurfInstallation } = req.body
+    const oldParent = category.parent ? String(category.parent) : null
 
     if (name !== undefined) {
-      category.name = name
-      if (!category.id || category.id === toSlug(name)) {
-        category.id = await generateUniqueSlug(name, category._id)
+      if (typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ message: 'Name is required' })
       }
+      category.name = name.trim()
     }
     if (blurb !== undefined) category.blurb = blurb
     if (autoBlurb !== undefined) category.autoBlurb = autoBlurb
@@ -222,38 +277,35 @@ router.put('/:id', protect, adminOnly, async (req, res, next) => {
         category.level = 0
         category.path = '/'
       } else {
-        const parentCat = await Category.findById(parent)
+        const parentCat = await Category.findById(parent).catch(() => null)
         if (!parentCat) {
           return res.status(400).json({ message: 'Parent category not found' })
         }
         if (parentCat._id.toString() === category._id.toString()) {
           return res.status(400).json({ message: 'Category cannot be its own parent' })
         }
-        if (parentCat.path.includes(category._id.toString())) {
+
+        const index = await loadCategoryIndex()
+        const parentResolved = resolveCategoryPath(index, parentCat)
+        if (!parentResolved.ok) {
+          return res.status(400).json({ message: 'Parent category hierarchy is invalid or cyclic' })
+        }
+        if (parentResolved.ancestors.some((ancestor) => ancestor._id.toString() === category._id.toString())) {
           return res.status(400).json({ message: 'Cannot set a descendant as parent' })
         }
-        category.parent = parent
-        category.level = parentCat.level + 1
-        category.path = `${parentCat.path}${parentCat._id}/`
+        category.parent = parentCat._id
+        category.level = parentResolved.level + 1
+        category.path = `${parentResolved.storedPath}${parentResolved.category._id}/`
       }
     }
 
     await category.save()
+    await cascadePathUpdate(category)
+    await cascadeProductCategoryPath(category)
 
-    // Cascade path updates to all descendants
-    await cascadePathUpdate(category._id, category.path, category.level)
-
-    // Cascade categoryPath updates to affected products
-    await cascadeProductCategoryPath(category._id)
-
-    // Update parent's blurb if it uses autoBlurb
-    if (category.parent) {
-      const parentCat = await Category.findById(category.parent)
-      if (parentCat && parentCat.autoBlurb) {
-        parentCat.blurb = await autoGenerateBlurb(parentCat._id)
-        await parentCat.save()
-      }
-    }
+    const newParent = category.parent ? String(category.parent) : null
+    await refreshParentBlurb(oldParent)
+    if (newParent !== oldParent) await refreshParentBlurb(newParent)
 
     res.json({ category })
   } catch (err) { next(err) }
@@ -265,26 +317,28 @@ router.delete('/:id', protect, adminOnly, async (req, res, next) => {
     const category = await Category.findById(req.params.id)
     if (!category) return res.status(404).json({ message: 'Category not found' })
 
-    const childCount = await Category.countDocuments({ parent: category._id })
-    if (childCount > 0) {
-      return res.status(400).json({ message: 'Cannot delete category with subcategories. Remove or reassign them first.' })
+    const index = await loadCategoryIndex()
+    const descendants = getDescendants(index, category)
+    if (descendants.length > 0) {
+      return res.status(400).json({
+        message: `Cannot delete category with ${descendants.length} subcategor${descendants.length === 1 ? 'y' : 'ies'}. Remove or reassign them first.`,
+      })
     }
 
-    const productCount = await Product.countDocuments({ categoryPath: category.id })
+    const references = [...new Set([category.id, String(category._id)])]
+    const productCount = await Product.countDocuments({
+      $or: [
+        { category: { $in: references } },
+        { categoryPath: { $in: references } },
+      ],
+    })
     if (productCount > 0) {
       return res.status(400).json({ message: `Cannot delete category used by ${productCount} product(s). Deactivate instead.` })
     }
 
+    const parentId = category.parent ? String(category.parent) : null
     await Category.findByIdAndDelete(category._id)
-
-    // Update parent's blurb if it uses autoBlurb
-    if (category.parent) {
-      const parentCat = await Category.findById(category.parent)
-      if (parentCat && parentCat.autoBlurb) {
-        parentCat.blurb = await autoGenerateBlurb(parentCat._id)
-        await parentCat.save()
-      }
-    }
+    await refreshParentBlurb(parentId)
 
     res.json({ message: 'Category deleted' })
   } catch (err) { next(err) }

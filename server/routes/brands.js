@@ -53,14 +53,20 @@ router.put('/:id', protect, adminOnly, async (req, res, next) => {
     if (!brand) return res.status(404).json({ message: 'Brand not found' })
 
     const { name, displayOrder, isActive } = req.body
+    const oldName = brand.name
     if (name !== undefined) {
-      brand.name = name
-      brand.slug = toSlug(name)
+      if (typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ message: 'Name is required' })
+      }
+      brand.name = name.trim()
     }
     if (displayOrder !== undefined) brand.displayOrder = displayOrder
     if (isActive !== undefined) brand.isActive = isActive
 
     await brand.save()
+    if (brand.name !== oldName) {
+      await Product.updateMany({ brand: oldName }, { $set: { brand: brand.slug } })
+    }
     res.json({ brand })
   } catch (err) { next(err) }
 })
@@ -71,7 +77,9 @@ router.delete('/:id', protect, adminOnly, async (req, res, next) => {
     const brand = await Brand.findById(req.params.id)
     if (!brand) return res.status(404).json({ message: 'Brand not found' })
 
-    const productCount = await Product.countDocuments({ brand: brand.slug })
+    const productCount = await Product.countDocuments({
+      $or: [{ brand: brand.slug }, { brand: brand.name }],
+    })
     if (productCount > 0) {
       return res.status(400).json({ message: `Cannot delete brand used by ${productCount} product(s). Deactivate instead.` })
     }

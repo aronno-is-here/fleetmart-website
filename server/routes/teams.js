@@ -59,9 +59,12 @@ router.put('/:id', protect, adminOnly, async (req, res, next) => {
     if (!team) return res.status(404).json({ message: 'Team not found' })
 
     const { name, primary, secondary, number, displayOrder, isActive } = req.body
+    const oldName = team.name
     if (name !== undefined) {
-      team.name = name
-      team.slug = toSlug(name)
+      if (typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ message: 'Name is required' })
+      }
+      team.name = name.trim()
     }
     if (primary !== undefined) team.primary = primary
     if (secondary !== undefined) team.secondary = secondary
@@ -70,6 +73,9 @@ router.put('/:id', protect, adminOnly, async (req, res, next) => {
     if (isActive !== undefined) team.isActive = isActive
 
     await team.save()
+    if (team.name !== oldName) {
+      await Product.updateMany({ team: oldName }, { $set: { team: team.slug } })
+    }
     res.json({ team })
   } catch (err) { next(err) }
 })
@@ -80,7 +86,9 @@ router.delete('/:id', protect, adminOnly, async (req, res, next) => {
     const team = await Team.findById(req.params.id)
     if (!team) return res.status(404).json({ message: 'Team not found' })
 
-    const productCount = await Product.countDocuments({ team: team.slug })
+    const productCount = await Product.countDocuments({
+      $or: [{ team: team.slug }, { team: team.name }],
+    })
     if (productCount > 0) {
       return res.status(400).json({ message: `Cannot delete team used by ${productCount} product(s). Deactivate instead.` })
     }
