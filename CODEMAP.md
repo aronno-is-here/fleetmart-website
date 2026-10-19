@@ -1,230 +1,186 @@
 # Fleetmart — Codebase Map
 
-Complete reference of every source file and which web page(s) it belongs to.
+Reference for the current routes, pages, hooks, services, and server modules.
 
 ---
 
-## Pages (`client/src/pages/`)
+## Storefront Pages (`client/src/pages/`)
 
 | File | Route | Description |
-|------|-------|-------------|
-| `Home.jsx` | `/` | Homepage — hero carousel, category tiles, featured products, flash deal, brand strip, stats, testimonials, recently viewed |
-| `Shop.jsx` | `/shop` | Product catalog with filters (category, brand, team, size, price, customizable) and sorting |
-| `ProductDetails.jsx` | `/product/:slug` | Single product detail — gallery, sizes, jersey customizer, add-to-cart, reviews, related products |
-| `Cart.jsx` | `/cart` | Shopping bag page with coupon code, order summary, proceed to checkout |
-| `Checkout.jsx` | `/checkout` | Multi-step checkout — address, shipping, payment, review, place order (protected) |
-| `OrderSuccess.jsx` | `/order/success` | Post-order confirmation page |
-| `Login.jsx` | `/login` | User login with Google/Apple social auth + email/password. Exports `AuthShell`, `AuthInput`, `PasswordInput`, `useAuthSubmit` (reused by Register) |
-| `Register.jsx` | `/register` | User registration. Imports shared auth components from `Login.jsx` |
-| `ForgotPassword.jsx` | `/forgot-password` | 3-step password reset — email/SMS selection, code verification, new password |
-| `Account.jsx` | `/account`, `/account/:tab` | User account dashboard with tabs — profile, orders, addresses, billing, wishlist (protected) |
-| `Wishlist.jsx` | `/account/wishlist` | Dedicated wishlist page with move-to-bag and remove actions |
-| `About.jsx` | `/about` | About page — brand story, stats, authenticity guarantee |
-| `Contact.jsx` | `/contact` | Contact form + hotline/WhatsApp/email/store address sidebar |
-| `Faq.jsx` | `/faq` | FAQ accordion with 7 questions |
-| `Policy.jsx` | `/policies/:slug` | Legal pages — shipping, returns, terms, privacy (content by slug param) |
-| `NotFound.jsx` | `*` | 404 page with jersey art |
+|---|---|---|
+| `Home.jsx` | `/` | Hero carousel, categories, featured products, flash deal, brands |
+| `Shop.jsx` | `/shop` | Filters (category tree, brand, team, size, price, customizable), sorting |
+| `ProductDetails.jsx` | `/product/:slug` | Gallery, sizes, customization, cart, reviews, related products |
+| `Cart.jsx` | `/cart` | Bag, coupon entry, totals |
+| `Checkout.jsx` | `/checkout` | Address, shipping, payment, review. Supports guests; online total excludes delivery |
+| `OrderSuccess.jsx` | `/order/success` | Confirmation; public order lookup; auth-aware tracking link |
+| `OrderLookup.jsx` | `/order/lookup` | Guest lookup by Order ID + email; accepts `?orderId=` |
+| `Login.jsx` | `/login` | Email/password + Google/Apple; exports shared auth UI |
+| `Register.jsx` | `/register` | Registration |
+| `ForgotPassword.jsx` | `/forgot-password` | 3-step reset |
+| `Account.jsx` | `/account`, `/account/:tab` | Profile, orders, addresses, billing, wishlist (protected) |
+| `Wishlist.jsx` | `/account/wishlist` | Saved products |
+| `About.jsx` | `/about` | Brand story |
+| `Contact.jsx` | `/contact` | Contact form and store details |
+| `Support.jsx` | `/support` | Help center |
+| `Faq.jsx` | `/faq` | FAQ accordion |
+| `Policy.jsx` | `/policies/:slug` | Shipping, returns, terms, privacy |
+| `NotFound.jsx` | `*` | 404 |
 
 ### Admin Pages (`client/src/pages/admin/`)
 
 | File | Route | Description |
-|------|-------|-------------|
-| `AdminLayout.jsx` | `/admin` | Admin sidebar + top bar + `<Outlet />` for child routes |
-| `AdminLogin.jsx` | `/admin/login` | Admin-only email/password login form |
-| `Dashboard.jsx` | `/admin` | Dashboard stats — revenue, orders, products, users, reviews, coupons, recent orders, low stock |
-| `AdminProducts.jsx` | `/admin/products` | Product CRUD table with image upload, category filter, pagination, modal edit form |
-| `AdminOrders.jsx` | `/admin/orders` | Order list table with status filter, inline status update, pagination |
-| `AdminUsers.jsx` | `/admin/users` | User list table with role toggle, block/unblock, pagination |
-| `AdminCoupons.jsx` | `/admin/coupons` | Coupon CRUD table with modal form (percent/flat, min order, max uses, expiry) |
-| `AdminReviews.jsx` | `/admin/reviews` | Review list table with visibility toggle and delete |
+|---|---|---|
+| `AdminLayout.jsx` | `/admin` | Sidebar, top bar, `<Outlet />` |
+| `AdminLogin.jsx` | `/admin/login` | Admin-only login |
+| `Dashboard.jsx` | `/admin` | Stats, recent orders, low stock |
+| `AdminProducts.jsx` | `/admin/products` | Product CRUD, images, category hierarchy, search/filter |
+| `AdminCategories.jsx` | `/admin/categories` | Nested category CRUD, reorder, auto-blurb, safe parent/delete |
+| `AdminBrands.jsx` | `/admin/brands` | Brand CRUD with stable slugs |
+| `AdminTeams.jsx` | `/admin/teams` | Team CRUD with stable slugs |
+| `AdminBanners.jsx` | `/admin/banners` | Hero banner CRUD |
+| `AdminOrders.jsx` | `/admin/orders` | Orders, status updates, read-only gateway payment states, preview |
+| `AdminUsers.jsx` | `/admin/users` | Roles, block/unblock |
+| `AdminCoupons.jsx` | `/admin/coupons` | Coupon CRUD |
+| `AdminReviews.jsx` | `/admin/reviews` | Visibility and delete |
+| `AdminAnalytics.jsx` | `/admin/analytics` | Sales analytics |
+| `AdminSettings.jsx` | `/admin/settings` | Profile/password settings |
 
 ---
 
-## Components (`client/src/components/`)
+## Components
 
-### Top-Level Components
-
-| File | Purpose | Used On |
-|------|---------|---------|
-| `CartDrawer.jsx` | Slide-in shopping bag sidebar with free-shipping progress bar | All store pages (via `StoreLayout.jsx`) |
-| `SearchOverlay.jsx` | Full-screen search overlay with live API results and popular suggestions | All store pages (via `StoreLayout.jsx`) |
-| `QuickView.jsx` | Modal product quick-view with size selector and add-to-cart | All store pages (via `StoreLayout.jsx`) |
-| `MatchBackground.jsx` | Animated canvas of a pseudo-3D football match rendered behind all content | All store pages (via `StoreLayout.jsx`) |
-| `ProductArt.jsx` | SVG art generators for every product type — JerseyArt, BootArt, BallArt, GloveArt, ConeArt, LadderArt, BibArt, GuardArt, BagArt, SockArt, ScarfArt, CapArt, TurfArt, StudioArt, ProductArt | Home, ProductDetails, Wishlist, About, NotFound, ProductCard, QuickView |
-| `ProductCard.jsx` | Product card with hover art flip, quick-add, wishlist toggle, quick-view button. Also exports `ProductCardSkeleton` | Home, Shop, ProductDetails |
-| `ProtectedRoute.jsx` | Auth guard — redirects to `/login` if no token/user in localStorage | App.jsx — wraps `/checkout`, `/account` |
-| `ErrorBoundary.jsx` | React error boundary catching render errors, shows 500 page | main.jsx — wraps entire app |
-
-### Layout Components (`client/src/components/layout/`)
-
-| File | Purpose | Used On |
-|------|---------|---------|
-| `Navbar.jsx` | Sticky top navigation — logo, mega menu, search/wishlist/account/cart icons, mobile drawer | All store pages (via `StoreLayout.jsx`) |
-| `Footer.jsx` | Footer — trust strip, newsletter signup, shop/support/company links, social icons, payment badges | All store pages (via `StoreLayout.jsx`) |
-| `Ticker.jsx` | Scrolling promotional marquee (volt-green bar with announcements) | All store pages (via `Navbar.jsx`) |
-
-### UI Components (`client/src/components/ui/`)
-
-| File | Purpose | Used On |
-|------|---------|---------|
-| `Rating.jsx` | Star rating display with half-star support | ProductDetails, ProductCard, QuickView |
-| `SectionHeading.jsx` | Reusable section header with eyebrow, title, and optional action link | Home, ProductDetails |
-| `Toaster.jsx` | Toast notification system (success, error, wishlist) reading from Redux | All store pages (via `StoreLayout.jsx`) |
-
----
-
-## Layout (`client/src/layouts/`)
-
-| File | Purpose | Pages Rendered Inside |
-|------|---------|----------------------|
-| `StoreLayout.jsx` | Wraps all public store pages with Navbar, Footer, CartDrawer, SearchOverlay, QuickView, Toaster, MatchBackground | Home, Shop, ProductDetails, Cart, Checkout, OrderSuccess, Login, Register, ForgotPassword, Account, Wishlist, About, Contact, Faq, Policy, NotFound |
-
----
-
-## Redux Features (`client/src/features/`)
-
-| File | Slice | Key Actions / Selectors | Used By |
-|------|-------|-------------------------|---------|
-| `cartSlice.js` | `cart` | `addToCart`, `removeFromCart`, `setQty`, `clearCart`; `cartCount`, `cartTotal` | ProductDetails, Cart, Checkout, Wishlist, ProductCard, QuickView, CartDrawer, Navbar |
-| `wishlistSlice.js` | `wishlist` | `toggleWishlist`; `inWishlist` | ProductDetails, Wishlist, ProductCard, QuickView |
-| `uiSlice.js` | `ui` | `setCartOpen`, `setSearchOpen`, `setMobileNavOpen`, `setQuickView`, `pushRecentlyViewed`, `toast`, `dismissToast` | ProductDetails, Cart, Checkout, Login, Register, ForgotPassword, Account, Contact, Wishlist, CartDrawer, SearchOverlay, ProductCard, QuickView, Navbar, Toaster |
-| `store/index.js` | Store config | Combines cart, wishlist, ui slices | main.jsx |
-
----
-
-## Library (`client/src/lib/`)
-
-| File | Purpose | Used By |
-|------|---------|---------|
-| `api.js` | Axios instance with base URL `/api`, JWT auth interceptor (auto-attaches Bearer token), 401 auto-redirect to login | All pages/components that make API calls (17+ files) |
-| `format.js` | Utility functions: `fmt()` (BDT currency formatter), `discounted()` (effective price), `discountPct()` (discount percentage), `totalStock()` (sum of stock map) | Home, Shop, ProductDetails, Cart, Checkout, Account, Wishlist, ProductCard, QuickView, SearchOverlay, CartDrawer |
-
----
-
-## Data (`client/src/data/`)
-
-| File | Purpose | Used By |
-|------|---------|---------|
-| `products.js` | Static reference data: `CATEGORIES` (8), `BRANDS` (5), `SIZES` (5), `BOOT_SIZES` (7), `TEAMS` (10 with colors), `categoryMeta()` helper | Home, Shop, ProductDetails, About, Navbar, Footer, SearchOverlay |
-
----
-
-## Server Files
-
-### Entry Point & Config
+### Top-Level (`client/src/components/`)
 
 | File | Purpose |
-|------|---------|
-| `server/server.js` | Express app — helmet, compression, CORS, rate limiting, body parsing, mongo-sanitize, static uploads, Morgan logging, route mounting, production SPA fallback, error handler, DB connect, listen |
-| `server/seed.js` | Database seeder — admin user, demo customer, 8 categories, 24 products, 3 coupons |
-| `server/config/db.js` | Mongoose connection to `MONGODB_URI` |
+|---|---|
+| `StoreLayout.jsx` | Public shell: Navbar, Footer, CartDrawer, SearchOverlay, QuickView, Toaster, MatchBackground |
+| `CartDrawer.jsx` | Slide-in bag with free-shipping progress |
+| `SearchOverlay.jsx` | Live search with category/brand/team names |
+| `QuickView.jsx` | Product quick view |
+| `MatchBackground.jsx` | Animated background canvas |
+| `ProductArt.jsx` | SVG art per product type |
+| `ProductCard.jsx` | Product card and skeleton |
+| `PriceRange.jsx` | Price filter control |
+| `ProtectedRoute.jsx` | Auth guard |
+| `ErrorBoundary.jsx` | Render error boundary |
+| `SEO.jsx` | Document metadata |
 
-### Middleware
+### Layout / UI
 
-| File | Purpose | Used By |
-|------|---------|---------|
-| `server/middleware/auth.js` | `protect` (JWT verification, attaches `req.user`), `adminOnly` (checks admin role) | All protected/admin routes |
-| `server/middleware/errorHandler.js` | Global Express error handler — returns JSON with status code and message | server.js |
+| File | Purpose |
+|---|---|
+| `components/layout/Navbar.jsx` | Sticky navigation, nested Shop menu, auth-aware links |
+| `components/layout/Footer.jsx` | Trust strip, links, socials, payment badges |
+| `components/layout/Ticker.jsx` | Promo marquee |
+| `components/ui/Rating.jsx` | Star rating |
+| `components/ui/SectionHeading.jsx` | Section header |
+| `components/ui/Toaster.jsx` | Redux toast renderer |
+
+---
+
+## Client State and Hooks
+
+| File | Purpose |
+|---|---|
+| `features/cartSlice.js` | Cart, `removePurchasedItems`, totals |
+| `features/wishlistSlice.js` | Wishlist |
+| `features/uiSlice.js` | Drawers, quick view, recently viewed, toasts |
+| `features/authSlice.js` | Token/user persistence |
+| `hooks/useCategories.js` | `useCategories`, `useFlatCategories`, `useCategoryCounts` |
+| `hooks/useBrands.js` | Brand list/CRUD helpers |
+| `hooks/useTeams.js` | Team list/CRUD helpers |
+
+## Client Libraries (`client/src/lib/`)
+
+| File | Purpose |
+|---|---|
+| `api.js` | Axios instance, JWT interceptor, 401 redirect |
+| `checkout.js` | Online total, partial payment, shipping fee (free ≥ ৳3000 else ৳80) |
+| `cart.js` | Cart helpers |
+| `order.js` | Purchased-line clearing rules |
+| `categoryTree.js` | Category tree flatten/search/parent options |
+| `format.js` | Currency, discounts, stock totals |
+
+Tests live beside `checkout`, `cart`, `order`, and `categoryTree`.
+
+---
+
+## Server
+
+### Entry and Startup
+
+| File | Purpose |
+|---|---|
+| `server/server.js` | Express app, middleware, route mounts, DB connect, optional startup tasks |
+| `server/config/db.js` | Mongoose connection |
+| `server/seed.js` | Destructive demo seeder (guarded) |
+| `server/startup/ensureTaxonomy.js` | Taxonomy defaults |
+| `server/startup/ensureDemoProduct.js` | Optional demo product (`ENABLE_DEMO_PRODUCT=true`) |
+| `server/startup/migrateProductReferences.js` | Legacy reference normalization |
+| `server/utils/seedGuard.js` | Pure seeder permission check |
 
 ### Models
 
-| File | Key Fields |
-|------|------------|
-| `server/models/User.js` | name, email, password (bcrypt), phone, avatar, role, addresses[], passwordResetToken/Expiry, verificationCode/Expiry, isActive |
-| `server/models/Product.js` | name, slug, description, category, subCategory, brand, team, price, discountPrice, stock (Map), rating, numReviews, images[], featured, isNew, customizable, artColors |
-| `server/models/Order.js` | orderId, user, items[], shippingAddress, paymentMethod, paymentStatus, orderStatus, statusHistory[], subtotal, shippingFee, discount, total, couponCode |
-| `server/models/Category.js` | id, name, blurb, image, isActive |
-| `server/models/Coupon.js` | code, discountType, value, minOrder, maxUses, usedCount, expiresAt, isActive |
-| `server/models/Review.js` | product, user, rating, comment, verifiedPurchase, isVisible |
+`User`, `Product`, `Order`, `PaymentAttempt`, `Category`, `Brand`, `Team`, `Banner`, `Coupon`, `Review`.
+
+- `Category` supports nested `parent`, stored `path`/`level`, stable `id`, `autoBlurb`.
+- `Order` tracks payment/refund fields, status history, side-effect markers, and receipt retry state.
 
 ### Routes
 
-| File | Mount | Endpoints | Purpose |
-|------|-------|-----------|---------|
-| `server/routes/auth.js` | `/api/auth` | POST register/login/google/apple/forgot-password/verify-code/reset-password/refresh/logout, GET me, PUT profile/password/addresses/billing | Full auth lifecycle |
-| `server/routes/products.js` | `/api/products` | GET / (filtered+paginated), GET /:slug, POST / (admin), PUT /:id (admin), DELETE /:id (admin) | Product catalog CRUD |
-| `server/routes/categories.js` | `/api/categories` | GET /, POST / (admin), PUT /:id (admin), DELETE /:id (admin) | Category CRUD |
-| `server/routes/orders.js` | `/api/orders` | POST / (auth, create), GET /my (auth), GET /:id (auth), GET / (admin), PUT /:id/status (admin) | Order placement & management |
-| `server/routes/reviews.js` | `/api/reviews` | GET /:productId (public), POST / (auth), DELETE /:id (admin), PUT /:id/visibility (admin) | Review CRUD with rating auto-update |
-| `server/routes/coupons.js` | `/api/coupons` | POST /validate (public), GET / (admin), POST / (admin), PUT /:id (admin), DELETE /:id (admin) | Coupon validation & CRUD |
-| `server/routes/admin.js` | `/api/admin` | GET /dashboard, GET /users, PUT /users/:id, GET /reviews | Admin aggregated data |
-| `server/routes/upload.js` | `/api/upload` | POST / (admin, multipart, up to 10 images) | Image file upload |
+| File | Mount | Purpose |
+|---|---|---|
+| `routes/auth.js` | `/api/auth` | Register/login/social/reset/profile/addresses/billing |
+| `routes/products.js` | `/api/products` | Catalog CRUD; server-derived `categoryPath` |
+| `routes/categories.js` | `/api/categories` | Nested CRUD, counts, reorder, safe delete |
+| `routes/brands.js` | `/api/brands` | Brand CRUD |
+| `routes/teams.js` | `/api/teams` | Team CRUD |
+| `routes/banners.js` | `/api/banners` | Hero banners |
+| `routes/orders.js` | `/api/orders` | Public/guest lookup, order history, admin status updates |
+| `routes/payment.js` | `/api/payment` | Initiate, success, cancel, IPN, status, reconcile, refund |
+| `routes/coupons.js` | `/api/coupons` | Validate and CRUD |
+| `routes/reviews.js` | `/api/reviews` | Product reviews, visibility |
+| `routes/admin.js` | `/api/admin` | Dashboard and user management |
+| `routes/analytics.js` | `/api/admin` | Analytics |
+| `routes/upload.js` | `/api/upload` | Cloudinary image upload |
 
----
-
-## Config Files
+### Services
 
 | File | Purpose |
-|------|---------|
-| `client/tailwind.config.js` | Custom colors (night, pitch, volt, ember, gold, azure), fonts (Bebas Neue, Oswald, Inter), animations, shadows |
-| `client/vite.config.js` | React plugin, dev proxy `/api` -> `localhost:5000`, production manual chunks |
-| `client/postcss.config.js` | tailwindcss + autoprefixer |
-| `client/index.html` | HTML entry — loads Google Fonts (Bebas Neue, Oswald, Inter) |
-| `package.json` (root) | Monorepo scripts — `dev`, `build`, `start`, `seed`, `install:all` |
-| `client/package.json` | Client deps — react 19, react-router-dom 7, redux toolkit, axios, framer-motion, lucide-react |
-| `server/package.json` | Server deps — express 4, mongoose 8, bcryptjs, jsonwebtoken, multer, nodemailer, helmet, cors, compression |
-| `Dockerfile` | Docker build configuration |
-| `docker-compose.yml` | Docker Compose orchestration |
-| `AGENTS.md` | Agent rules — always commit after completing tasks |
-| `.gitignore` | Git ignore rules |
+|---|---|
+| `pricing.js` | Server-authoritative pricing, coupons, shipping constants |
+| `orderPricing.js` | Order pricing entry point |
+| `orderStatus.js` | Order/payment status validation and refund intent |
+| `paymentFulfillment.js` | Transactional order creation, stock, coupon, receipts |
+| `mongoTransactions.js` | Transaction support detection |
+| `uddoktapay.js` | Gateway request/configuration |
+| `refund.js` | Verified refunds |
+| `email.js` | Receipt and notification email |
+| `taxonomy.js` | Category index, paths, descendants, counts, slugs |
+| `taxonomyBackfill.js` | Legacy taxonomy repair |
 
 ---
 
-## Route-to-File Quick Reference
+## Route Quick Reference
 
-| Route | Page File | Layout | Auth |
-|-------|-----------|--------|------|
-| `/` | `Home.jsx` | `StoreLayout.jsx` | Public |
-| `/shop` | `Shop.jsx` | `StoreLayout.jsx` | Public |
-| `/product/:slug` | `ProductDetails.jsx` | `StoreLayout.jsx` | Public |
-| `/cart` | `Cart.jsx` | `StoreLayout.jsx` | Public |
-| `/checkout` | `Checkout.jsx` | `StoreLayout.jsx` | Protected |
-| `/order/success` | `OrderSuccess.jsx` | `StoreLayout.jsx` | Public |
-| `/login` | `Login.jsx` | `StoreLayout.jsx` | Public |
-| `/register` | `Register.jsx` | `StoreLayout.jsx` | Public |
-| `/forgot-password` | `ForgotPassword.jsx` | `StoreLayout.jsx` | Public |
-| `/account` | `Account.jsx` | `StoreLayout.jsx` | Protected |
-| `/account/wishlist` | `Wishlist.jsx` | `StoreLayout.jsx` | Public |
-| `/about` | `About.jsx` | `StoreLayout.jsx` | Public |
-| `/contact` | `Contact.jsx` | `StoreLayout.jsx` | Public |
-| `/faq` | `Faq.jsx` | `StoreLayout.jsx` | Public |
-| `/policies/:slug` | `Policy.jsx` | `StoreLayout.jsx` | Public |
-| `*` | `NotFound.jsx` | `StoreLayout.jsx` | Public |
-| `/admin` | `Dashboard.jsx` | `AdminLayout.jsx` | Admin |
-| `/admin/login` | `AdminLogin.jsx` | None | Public |
-| `/admin/products` | `AdminProducts.jsx` | `AdminLayout.jsx` | Admin |
-| `/admin/orders` | `AdminOrders.jsx` | `AdminLayout.jsx` | Admin |
-| `/admin/users` | `AdminUsers.jsx` | `AdminLayout.jsx` | Admin |
-| `/admin/coupons` | `AdminCoupons.jsx` | `AdminLayout.jsx` | Admin |
-| `/admin/reviews` | `AdminReviews.jsx` | `AdminLayout.jsx` | Admin |
+| Route | Access |
+|---|---|
+| `/`, `/shop`, `/product/:slug`, `/cart`, `/checkout`, `/order/success`, `/order/lookup`, `/login`, `/register`, `/forgot-password`, `/about`, `/contact`, `/support`, `/faq`, `/policies/:slug` | Public / guest |
+| `/account`, `/account/:tab` | Authenticated |
+| `/account/wishlist` | Authenticated |
+| `/admin`, `/admin/products`, `/admin/categories`, `/admin/brands`, `/admin/teams`, `/admin/banners`, `/admin/orders`, `/admin/users`, `/admin/coupons`, `/admin/reviews`, `/admin/analytics`, `/admin/settings` | Admin |
+| `/admin/login` | Public |
 
 ---
 
-## Component Dependency Tree
+## Config
 
-```
-main.jsx
-  ├── ErrorBoundary.jsx (wraps all)
-  ├── store/index.js
-  │     ├── cartSlice.js
-  │     ├── wishlistSlice.js
-  │     └── uiSlice.js
-  └── App.jsx
-        ├── StoreLayout.jsx (ALL public routes)
-        │     ├── Navbar.jsx → Ticker.jsx
-        │     ├── Footer.jsx
-        │     ├── MatchBackground.jsx
-        │     ├── CartDrawer.jsx
-        │     ├── SearchOverlay.jsx
-        │     ├── QuickView.jsx
-        │     └── Toaster.jsx
-        ├── ProtectedRoute.jsx (wraps /checkout, /account)
-        └── AdminLayout.jsx (ALL admin routes)
-              ├── AdminLogin.jsx
-              ├── Dashboard.jsx
-              ├── AdminProducts.jsx
-              ├── AdminOrders.jsx
-              ├── AdminUsers.jsx
-              ├── AdminCoupons.jsx
-              └── AdminReviews.jsx
-```
+| File | Purpose |
+|---|---|
+| `client/vite.config.js` | React plugin, `/api` dev proxy, chunking |
+| `client/tailwind.config.js` | Colors, fonts, animations |
+| `vercel.json` | API rewrite and SPA fallback |
+| `api/index.js` | Vercel serverless entry |
+| `scripts/postbuild.js` | Copies `client/dist` to `public/` |
+| `Dockerfile`, `docker-compose.yml` | Container deployment with a single-node replica set |

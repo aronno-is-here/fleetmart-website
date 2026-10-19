@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Search, Package, ChevronRight } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { Search } from 'lucide-react'
 import { fmt } from '../lib/format'
 import api from '../lib/api'
 
 const ORDER_STAGES = ['processing', 'confirmed', 'shipped', 'delivered']
 
 export default function OrderLookup() {
-  const [orderId, setOrderId] = useState('')
+  const [searchParams] = useSearchParams()
+  const [orderId, setOrderId] = useState(() => searchParams.get('orderId') || '')
   const [email, setEmail] = useState('')
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(false)

@@ -6,10 +6,13 @@ import User from './models/User.js'
 import Product from './models/Product.js'
 import Category from './models/Category.js'
 import Coupon from './models/Coupon.js'
+import { resolveSeedPermission } from './utils/seedGuard.js'
 
-// Prevent seeding in production
-if (process.env.NODE_ENV === 'production') {
-  console.error('Refusing to seed in production environment. Set NODE_ENV=development to seed.')
+// Seeding deletes all users, products, categories, and coupons. Never allow it
+// in production, and require an explicit reset confirmation.
+const permission = resolveSeedPermission()
+if (!permission.ok) {
+  console.error(permission.message)
   process.exit(1)
 }
 

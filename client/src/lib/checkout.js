@@ -8,6 +8,11 @@ export const calculateOnlineTotal = (subtotal, discount = 0) => {
   return Math.max(0, base - off)
 }
 
+export const calculateShippingFee = (subtotal) => {
+  const base = Number(subtotal) || 0
+  return base >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING_FEE
+}
+
 export const calculateAmountToPay = (paymentType, onlineTotal) => {
   const total = Math.max(0, Number(onlineTotal) || 0)
   if (paymentType === 'partial') {

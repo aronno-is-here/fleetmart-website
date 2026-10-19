@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { useDispatch } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import { CheckCircle2 } from 'lucide-react'
 import { removePurchasedItems } from '../features/cartSlice'
 import { fmt } from '../lib/format'
@@ -12,6 +12,10 @@ export default function OrderSuccess() {
   const [searchParams] = useSearchParams()
   const orderId = searchParams.get('orderId')
   const [order, setOrder] = useState(null)
+  const token = useSelector((state) => state.auth.token)
+  const trackOrderPath = token
+    ? '/account/orders'
+    : orderId ? `/order/lookup?orderId=${encodeURIComponent(orderId)}` : '/order/lookup'
 
   useEffect(() => {
     if (!orderId) return
@@ -76,7 +80,7 @@ export default function OrderSuccess() {
         )}
 
         <div className="mt-8 flex justify-center gap-3">
-          <Link to="/account/orders" className="btn-volt !text-xs">Track Order</Link>
+          <Link to={trackOrderPath} className="btn-volt !text-xs">Track Order</Link>
           <Link to="/shop" className="btn-ghost !text-xs">Keep Shopping</Link>
         </div>
       </div>

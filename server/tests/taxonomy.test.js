@@ -3,10 +3,12 @@ import assert from 'node:assert/strict'
 import {
   buildCategoryIndex,
   buildCategoryProductCounts,
+  categorySlugBase,
   getCategoryFamily,
   getDescendants,
   resolveCategoryPath,
   sameStringArray,
+  toCategorySlug,
 } from '../services/taxonomy.js'
 
 const root = { _id: '507f1f77bcf86cd799439001', id: 'jersey', parent: null }
@@ -105,4 +107,14 @@ test('buildCategoryProductCounts initializes zero for every category and ignores
   ])
 
   assert.deepEqual(counts, { jersey: 0, club: 0, premier: 0, boots: 0 })
+})
+
+test('category slugs stay stable for ASCII names and fall back for non-Latin names', () => {
+  assert.equal(categorySlugBase('Club Jerseys'), 'club-jerseys')
+  assert.equal(categorySlugBase('  Club   Jerseys  '), 'club-jerseys')
+  assert.equal(categorySlugBase('??????'), 'category')
+  assert.equal(categorySlugBase(''), 'category')
+  assert.equal(categorySlugBase(null), 'category')
+  assert.equal(toCategorySlug('??????', 2), 'category-2')
+  assert.equal(toCategorySlug('Club Jerseys', 1), 'club-jerseys-1')
 })

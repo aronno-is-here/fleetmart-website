@@ -389,6 +389,51 @@ describe('taxonomy integrity against an isolated database', { skip }, () => {
     assert.equal(teamDelete.status, 400)
   })
 
+  it('generates non-empty unique ids for non-Latin category names', async () => {
+    const first = await createCategory('জার্সি')
+    const second = await createCategory('জার্সি')
+
+    assert.equal(first.id, 'category')
+    assert.equal(second.id, 'category-1')
+    assert.notEqual(first._id, second._id)
+
+    const ascii = await createCategory('Club Jerseys')
+    assert.equal(ascii.id, 'club-jerseys')
+  })
+
+  it('refreshes auto blurbs when enabled and after bulk reorder', async () => {
+    const rootResult = await api('POST', '/api/categories', {
+      name: 'Jerseys',
+      blurb: 'Manual blurb',
+      autoBlurb: false,
+    })
+    assert.equal(rootResult.status, 201, JSON.stringify(rootResult.data))
+    const root = rootResult.data.category
+
+    const club = await createCategory('Club', root._id)
+    let stored = await Category.findById(root._id)
+    assert.equal(stored.blurb, 'Manual blurb')
+
+    const enabled = await api('PUT', `/api/categories/${root._id}`, { autoBlurb: true })
+    assert.equal(enabled.status, 200, JSON.stringify(enabled.data))
+    assert.equal(enabled.data.category.blurb, 'Club')
+
+    const national = await createCategory('National', root._id)
+    stored = await Category.findById(root._id)
+    assert.equal(stored.blurb, 'Club · National')
+
+    const reordered = await api('PUT', '/api/categories/reorder/bulk', {
+      items: [
+        { id: national._id, displayOrder: 0 },
+        { id: club._id, displayOrder: 1 },
+      ],
+    })
+    assert.equal(reordered.status, 200, JSON.stringify(reordered.data))
+
+    stored = await Category.findById(root._id)
+    assert.equal(stored.blurb, 'National · Club')
+  })
+
   it('backfills legacy taxonomy data only when applied and is idempotent', async () => {
     const root = await createCategory('Jerseys')
     const child = await createCategory('Club', root._id)

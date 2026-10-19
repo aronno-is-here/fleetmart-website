@@ -7,6 +7,7 @@ import { priceOrder } from '../services/orderPricing.js'
 import { PricingError } from '../services/pricing.js'
 import { escapeRegex, escapeHtml } from '../utils/sanitize.js'
 import { processRefund } from '../services/refund.js'
+import { resolveOrderStatusUpdate } from '../services/orderStatus.js'
 import { isUddoktaPayConfigured, uddoktapayRequest } from '../services/uddoktapay.js'
 
 const router = Router()
@@ -93,21 +94,26 @@ router.put('/:id/status', protect, adminOnly, async (req, res, next) => {
     const order = await Order.findById(req.params.id).populate('user', 'name email')
     if (!order) return res.status(404).json({ message: 'Order not found' })
 
-    if (status) {
-      order.orderStatus = status
-      order.statusHistory.push({ status, timestamp: new Date(), note })
-      if (status === 'delivered' && order.paymentStatus !== 'paid') order.paymentStatus = 'paid'
+    const resolution = resolveOrderStatusUpdate({
+      status,
+      paymentStatus,
+      currentPaymentStatus: order.paymentStatus,
+    })
+    if (!resolution.ok) {
+      return res.status(400).json({ message: resolution.message })
     }
-    if (paymentStatus) {
-      const VALID_PAYMENT_STATUSES = ['pending', 'partial', 'paid', 'failed', 'refunded', 'refund_requested', 'refund_failed']
-      if (VALID_PAYMENT_STATUSES.includes(paymentStatus)) {
-        order.paymentStatus = paymentStatus
-      }
+
+    if (resolution.orderStatus) {
+      order.orderStatus = resolution.orderStatus
+      order.statusHistory.push({ status: resolution.orderStatus, timestamp: new Date(), note })
+    }
+    if (resolution.paymentStatus) {
+      order.paymentStatus = resolution.paymentStatus
     }
     await order.save()
 
     // ── Auto-refund when admin cancels a paid/partial order ──
-    if (status === 'cancelled' && ['paid', 'partial'].includes(order.paymentStatus)) {
+    if (resolution.shouldRefund) {
       const refundResult = await processRefund(order, {
         reason: note || 'Order cancelled by admin',
         context: 'admin_cancel',
@@ -120,11 +126,13 @@ router.put('/:id/status', protect, adminOnly, async (req, res, next) => {
     }
 
     const recipientEmail = order.user?.email || order.guestEmail
-    if (recipientEmail) {
+    if (recipientEmail && resolution.orderStatus) {
       const customerName = order.user?.name || order.guestName || 'Customer'
       const safeName = escapeHtml(customerName)
       const safeNote = note ? escapeHtml(note) : ''
       const statusLabels = {
+        pending: 'Your order has been received',
+        processing: 'Your order is being prepared',
         confirmed: 'Your order has been confirmed',
         shipped: 'Your order has been shipped',
         out_for_delivery: 'Your order is out for delivery',
@@ -132,10 +140,10 @@ router.put('/:id/status', protect, adminOnly, async (req, res, next) => {
         cancelled: 'Your order has been cancelled',
         returned: 'Your order has been returned',
       }
-      const subject = `FleetMart — Order #${order.orderId} ${statusLabels[status] ? '— ' + statusLabels[status] : ''}`
-      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#0a0a0a;font-family:'Segoe UI',system-ui,sans-serif;"><div style="max-width:600px;margin:0 auto;padding:32px 20px;"><div style="text-align:center;margin-bottom:24px;"><div style="display:inline-block;background:#ccff00;color:#0a0a0a;font-size:18px;font-weight:900;letter-spacing:3px;padding:6px 14px;">FLEETMART</div></div><div style="background:#111;border:1px solid #222;padding:32px;text-align:center;"><h1 style="margin:0 0 12px;color:#fff;font-size:20px;text-transform:uppercase;letter-spacing:2px;">Order Update</h1><p style="margin:0 0 8px;color:#999;font-size:14px;">Hi ${safeName},</p><p style="margin:0 0 16px;color:#ccc;font-size:16px;">${statusLabels[status] || `Your order status has been updated to ${escapeHtml(status)}`}</p><p style="margin:0;color:#ccff00;font-size:14px;font-weight:700;">#${order.orderId}</p>${safeNote ? `<p style="margin:12px 0 0;color:#999;font-size:13px;">Note: ${safeNote}</p>` : ''}</div><div style="text-align:center;padding:20px 0;"><p style="margin:0;color:#666;font-size:11px;">© ${new Date().getFullYear()} FleetMart</p></div></div></body></html>`
+      const subject = `FleetMart — Order #${order.orderId} ${statusLabels[resolution.orderStatus] ? '— ' + statusLabels[resolution.orderStatus] : ''}`
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#0a0a0a;font-family:'Segoe UI',system-ui,sans-serif;"><div style="max-width:600px;margin:0 auto;padding:32px 20px;"><div style="text-align:center;margin-bottom:24px;"><div style="display:inline-block;background:#ccff00;color:#0a0a0a;font-size:18px;font-weight:900;letter-spacing:3px;padding:6px 14px;">FLEETMART</div></div><div style="background:#111;border:1px solid #222;padding:32px;text-align:center;"><h1 style="margin:0 0 12px;color:#fff;font-size:20px;text-transform:uppercase;letter-spacing:2px;">Order Update</h1><p style="margin:0 0 8px;color:#999;font-size:14px;">Hi ${safeName},</p><p style="margin:0 0 16px;color:#ccc;font-size:16px;">${statusLabels[resolution.orderStatus]}</p><p style="margin:0;color:#ccff00;font-size:14px;font-weight:700;">#${order.orderId}</p>${safeNote ? `<p style="margin:12px 0 0;color:#999;font-size:13px;">Note: ${safeNote}</p>` : ''}</div><div style="text-align:center;padding:20px 0;"><p style="margin:0;color:#666;font-size:11px;">© ${new Date().getFullYear()} FleetMart</p></div></div></body></html>`
       sendEmail(recipientEmail, subject, html)
-        .catch((err) => console.error(`[EMAIL] Status notification failed | Order: ${order.orderId} | Status: ${status} | Error: ${err.message}`))
+        .catch((err) => console.error(`[EMAIL] Status notification failed | Order: ${order.orderId} | Status: ${resolution.orderStatus} | Error: ${err.message}`))
     }
 
     res.json({ order })

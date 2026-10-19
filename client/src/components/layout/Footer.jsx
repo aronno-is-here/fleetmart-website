@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useSelector } from 'react-redux'
 import { Zap, ShieldCheck, Truck, RefreshCcw, BadgeCheck } from 'lucide-react'
 import { useFlatCategories } from '../../hooks/useCategories'
 
@@ -14,6 +15,8 @@ export default function Footer() {
   const [email, setEmail] = useState('')
   const [done, setDone] = useState(false)
   const { categories: CATEGORIES } = useFlatCategories()
+  const token = useSelector((state) => state.auth.token)
+  const trackOrderPath = token ? '/account/orders' : '/order/lookup'
 
   return (
     <footer className="border-t border-line bg-pitch">
@@ -89,7 +92,7 @@ export default function Footer() {
           <p className="font-head text-sm font-semibold uppercase tracking-[0.2em] text-chalk">Support</p>
           <ul className="mt-4 space-y-2.5">
             {[
-              ['Track Order', '/account/orders'],
+              ['Track Order', trackOrderPath],
               ['Shipping Info', '/policies/shipping'],
               ['Returns & Refunds', '/policies/returns'],
               ['FAQ', '/faq'],

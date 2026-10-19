@@ -4,9 +4,10 @@ import api from '../../lib/api'
 
 const fmt = (n) => `৳${Number(n).toLocaleString()}`
 
-const STATUS = ['processing', 'confirmed', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'returned']
-const PAYMENT_STATUS = ['pending', 'partial', 'paid', 'failed', 'cancelled', 'refund_requested', 'refund_failed', 'refunded']
+const STATUS = ['pending', 'processing', 'confirmed', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'returned']
+const MANUAL_PAYMENT_STATUSES = ['pending', 'failed']
 const statusColors = {
+  pending: 'bg-gold/20 text-gold',
   processing: 'bg-gold/20 text-gold',
   confirmed: 'bg-azure/20 text-azure',
   shipped: 'bg-volt/20 text-volt',
@@ -20,7 +21,7 @@ const paymentStatusColors = {
   partial: 'bg-orange-500/20 text-orange-400',
   paid: 'bg-green-500/20 text-green-400',
   failed: 'bg-ember/20 text-ember',
-  cancelled: 'bg-ember/20 text-ember',
+  expired: 'bg-muted/20 text-muted',
   refund_requested: 'bg-orange-500/20 text-orange-400',
   refund_failed: 'bg-ember/20 text-ember',
   refunded: 'bg-green-500/20 text-green-400',
@@ -254,14 +255,23 @@ export default function AdminOrders() {
                 <td className="px-4 py-3 text-volt font-semibold">{fmt(o.amountPaid || 0)}</td>
                 <td className="px-4 py-3 text-muted">{fmt(o.remainingAmount || 0)}</td>
                 <td className="px-4 py-3">
-                  <select
-                    value={o.paymentStatus}
-                    onChange={e => updatePayment(o._id, e.target.value)}
-                    disabled={updating === o._id}
-                    className={`bg-pitch2 border border-line px-2 py-1 text-xs text-chalk ${paymentStatusColors[o.paymentStatus] || ''}`}
-                  >
-                    {PAYMENT_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                  {MANUAL_PAYMENT_STATUSES.includes(o.paymentStatus) ? (
+                    <select
+                      value={o.paymentStatus}
+                      onChange={e => updatePayment(o._id, e.target.value)}
+                      disabled={updating === o._id}
+                      className={`bg-pitch2 border border-line px-2 py-1 text-xs text-chalk ${paymentStatusColors[o.paymentStatus] || ''}`}
+                    >
+                      {MANUAL_PAYMENT_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  ) : (
+                    <span
+                      className={`text-[10px] font-head uppercase px-2 py-0.5 ${paymentStatusColors[o.paymentStatus] || ''}`}
+                      title="Managed by the payment gateway"
+                    >
+                      {o.paymentStatus}
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <span className={`text-[10px] font-head uppercase px-2 py-0.5 ${statusColors[o.orderStatus] || ''}`}>

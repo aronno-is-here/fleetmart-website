@@ -4,6 +4,7 @@ import {
   PARTIAL_PAYMENT_AMOUNT,
   calculateAmountToPay,
   calculateOnlineTotal,
+  calculateShippingFee,
 } from './checkout.js'
 
 test('online total subtracts the coupon discount and never goes below zero', () => {
@@ -20,4 +21,11 @@ test('partial payment is capped at the online payable total below 300', () => {
 test('partial payment uses the 300 minimum above the threshold', () => {
   assert.equal(calculateAmountToPay('partial', 1000), PARTIAL_PAYMENT_AMOUNT)
   assert.equal(calculateAmountToPay('full', 1000), 1000)
+})
+
+test('shipping is free from 3000 and otherwise matches the server standard fee', () => {
+  assert.equal(calculateShippingFee(2999), 80)
+  assert.equal(calculateShippingFee(3000), 0)
+  assert.equal(calculateShippingFee(4500), 0)
+  assert.equal(calculateShippingFee('1200'), 80)
 })

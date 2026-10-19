@@ -5,29 +5,21 @@ import { protect, adminOnly } from '../middleware/auth.js'
 import {
   buildCategoryIndex,
   buildCategoryProductCounts,
+  categorySlugBase,
   getDescendants,
   resolveCategoryPath,
   sameStringArray,
+  toCategorySlug,
 } from '../services/taxonomy.js'
 
 const router = Router()
 
-function toSlug(name) {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/[\s]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-}
-
 async function generateUniqueSlug(name, excludeId = null) {
-  let slug = toSlug(name)
+  let slug = categorySlugBase(name)
   let existing = await Category.findOne({ id: slug, ...(excludeId ? { _id: { $ne: excludeId } } : {}) })
   let counter = 1
   while (existing) {
-    slug = `${toSlug(name)}-${counter}`
+    slug = toCategorySlug(name, counter)
     existing = await Category.findOne({ id: slug, ...(excludeId ? { _id: { $ne: excludeId } } : {}) })
     counter++
   }
@@ -316,6 +308,13 @@ router.put('/:id', protect, adminOnly, async (req, res, next) => {
       }
     }
 
+    const shouldRefreshBlurb =
+      (autoBlurb === true || (autoBlurb === undefined && category.autoBlurb)) &&
+      (blurb === undefined || blurb === '')
+    if (shouldRefreshBlurb) {
+      category.blurb = await autoGenerateBlurb(category._id)
+    }
+
     await category.save()
     await cascadePathUpdate(category)
     await cascadeProductCategoryPath(category)
@@ -377,6 +376,11 @@ router.put('/reorder/bulk', protect, adminOnly, async (req, res, next) => {
     }))
 
     await Category.bulkWrite(ops)
+
+    const reordered = await Category.find({ _id: { $in: items.map(({ id }) => id) } }).select('parent')
+    const parentIds = [...new Set(reordered.map((category) => category.parent && String(category.parent)).filter(Boolean))]
+    for (const parentId of parentIds) await refreshParentBlurb(parentId)
+
     res.json({ message: 'Reorder saved' })
   } catch (err) { next(err) }
 })

@@ -30,6 +30,7 @@ const DEMO_PRODUCT = {
 let ensured = false
 
 export default async function ensureDemoProduct() {
+  if (process.env.ENABLE_DEMO_PRODUCT !== 'true') return
   if (ensured) return
 
   try {

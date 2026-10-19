@@ -5,7 +5,7 @@ import { Check, ChevronRight, CreditCard, Truck, Wallet, ShoppingCart, Clock } f
 import { cartTotal } from '../features/cartSlice'
 import { toast } from '../features/uiSlice'
 import { fmt } from '../lib/format'
-import { calculateAmountToPay, calculateOnlineTotal } from '../lib/checkout'
+import { calculateAmountToPay, calculateOnlineTotal, calculateShippingFee } from '../lib/checkout'
 import api from '../lib/api'
 
 const STEPS = ['Address', 'Shipping', 'Payment', 'Review']
@@ -18,7 +18,7 @@ export default function Checkout() {
   const items = useSelector((s) => s.cart)
   const total = useSelector(cartTotal)
   const passed = location.state || {}
-  const shipping = passed.shipping ?? (total >= 3000 ? 0 : 80)
+  const shipping = passed.shipping ?? calculateShippingFee(total)
 
   const [discount, setDiscount] = useState(passed.discount ?? 0)
   const [couponCode, setCouponCode] = useState(passed.couponCode || '')
@@ -26,7 +26,6 @@ export default function Checkout() {
   const [step, setStep] = useState(0)
   const [method, setMethod] = useState('uddoktapay')
   const [paymentType, setPaymentType] = useState('full')
-  const [ship, setShip] = useState('standard')
   const [done, setDone] = useState(false)
   const [placing, setPlacing] = useState(false)
   const [orderId, setOrderId] = useState('')
@@ -126,7 +125,7 @@ export default function Checkout() {
           country: 'Bangladesh',
         },
         paymentType,
-        shippingMethod: ship,
+        shippingMethod: 'standard',
         couponCode,
         note: addr.note || '',
         guestInfo: !token ? { name: addr.name, email: addr.email, phone: addr.phone } : undefined,
@@ -157,7 +156,7 @@ export default function Checkout() {
             <div className="mt-4 border border-line bg-pitch p-4 text-sm">
               <p className="text-chalk">Amount paid: <span className="text-volt">{fmt(amountToPay)}</span></p>
               <p className="text-muted">Remaining: {fmt(finalTotal - amountToPay)} (to be paid on delivery)</p>
-              <p className="text-xs text-muted mt-1">Delivery charge (৳80–130) is paid separately to the delivery man.</p>
+              <p className="text-xs text-muted mt-1">Delivery charge is paid separately to the delivery man.</p>
             </div>
           )}
           <div className="mt-8 flex justify-center gap-3">
@@ -241,19 +240,14 @@ export default function Checkout() {
           {step === 1 && (
             <div className="space-y-3">
               <p className="font-head text-sm font-semibold uppercase tracking-widest text-chalk">Delivery Speed</p>
-              {[
-                { id: 'standard', icon: <Truck size={18} />, title: 'Standard · 2–4 days', sub: 'Dhaka 24–48h inside city', fee: shipping },
-                { id: 'express', icon: <Truck size={18} />, title: 'Express · Next day (Dhaka only)', fee: 150 },
-              ].map((o) => (
-                <button key={o.id} onClick={() => setShip(o.id)} className={`flex w-full items-center gap-4 border p-4 text-left transition-colors ${ship === o.id ? 'border-volt bg-volt/5' : 'border-line hover:border-volt/50'}`}>
-                  <span className="text-volt">{o.icon}</span>
-                  <span className="flex-1">
-                    <span className="block font-head text-sm font-semibold uppercase tracking-wide text-chalk">{o.title}</span>
-                    <span className="text-xs text-muted">Tracked to your door</span>
-                  </span>
-                  <span className="font-head font-semibold text-chalk">{o.fee === 0 ? <span className="text-volt">FREE</span> : fmt(o.fee)}</span>
-                </button>
-              ))}
+              <div className="flex w-full items-center gap-4 border border-volt bg-volt/5 p-4 text-left">
+                <span className="text-volt"><Truck size={18} /></span>
+                <span className="flex-1">
+                  <span className="block font-head text-sm font-semibold uppercase tracking-wide text-chalk">Standard · 2–4 days</span>
+                  <span className="text-xs text-muted">Dhaka 24–48h inside city</span>
+                </span>
+                <span className="font-head font-semibold text-chalk">{shipping === 0 ? <span className="text-volt">FREE</span> : fmt(shipping)}</span>
+              </div>
             </div>
           )}
 
@@ -295,7 +289,7 @@ export default function Checkout() {
               </ul>
               <div className="grid gap-2 text-sm text-muted sm:grid-cols-2">
                 <p><span className="uppercase tracking-widest text-xs block text-muted">Ship to</span>{addr.name || '—'} · {addr.phone}<br />{addr.street}, {addr.city}</p>
-                <p><span className="uppercase tracking-widest text-xs block text-muted">Method</span>{ship === 'express' ? 'Express delivery' : 'Standard delivery'}<br />Paying via UddoktaPay ({paymentType === 'partial' ? 'Partial' : 'Full'})</p>
+                <p><span className="uppercase tracking-widest text-xs block text-muted">Method</span>Standard delivery<br />Paying via UddoktaPay ({paymentType === 'partial' ? 'Partial' : 'Full'})</p>
               </div>
               {paymentType === 'partial' && (
                 <div className="border border-volt/30 bg-volt/5 p-4 text-sm">
@@ -338,7 +332,7 @@ export default function Checkout() {
           </dl>
           <div className="mt-4 border border-line bg-night p-3 text-xs leading-relaxed text-muted">
             <p className="mb-2 font-head text-[11px] uppercase tracking-widest text-muted">Shipping Charges</p>
-            <p>Inside Dhaka: ৳80 · Outside Dhaka: ৳130</p>
+            <p>Standard delivery: FREE on orders ৳3,000+ · otherwise ৳80</p>
             <p className="mt-1 text-volt">Delivery charge is paid separately to the delivery man.</p>
           </div>
           <div className="mt-3 border border-line bg-night p-3 text-xs leading-relaxed text-muted">

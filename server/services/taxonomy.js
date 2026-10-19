@@ -1,3 +1,19 @@
+export function categorySlugBase(name) {
+  const slug = String(name ?? '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/[\s]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+  return slug || 'category'
+}
+
+export function toCategorySlug(name, counter) {
+  const base = categorySlugBase(name)
+  return counter ? `${base}-${counter}` : base
+}
+
 export function buildCategoryIndex(categories = []) {
   const byObjectId = new Map()
   const bySlug = new Map()

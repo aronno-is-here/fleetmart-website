@@ -103,7 +103,7 @@ if (process.env.VERCEL) {
       try {
         await connectDB()
         dbConnected = true
-        ensureDemoProduct()
+        if (process.env.ENABLE_DEMO_PRODUCT === 'true') ensureDemoProduct()
         ensureTaxonomy()
         migrateProductReferences()
       } catch (err) {
@@ -158,7 +158,7 @@ process.on('uncaughtException', (err) => {
 // Start
 if (!process.env.VERCEL) {
   connectDB().then(() => {
-    ensureDemoProduct()
+    if (process.env.ENABLE_DEMO_PRODUCT === 'true') ensureDemoProduct()
     ensureTaxonomy()
     migrateProductReferences()
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
