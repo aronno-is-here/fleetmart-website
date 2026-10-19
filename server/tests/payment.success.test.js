@@ -242,6 +242,7 @@ before(async () => {
   const { default: paymentRouter } = await import('../routes/payment.js')
   const app = express()
   app.use(express.json())
+  app.use(express.urlencoded({ extended: false }))
   app.use('/api/payment', paymentRouter)
   await new Promise((resolve) => {
     server = app.listen(0, '127.0.0.1', resolve)
@@ -255,8 +256,8 @@ after(async () => {
 
 const success = () => fetch(`${baseUrl}/api/payment/success`, {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ invoice_id: 'invoice-test-1' }),
+  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  body: new URLSearchParams({ invoice_id: 'invoice-test-1' }),
   redirect: 'manual',
 })
 
@@ -337,6 +338,23 @@ test('IPN rejects an invalid webhook key without calling the gateway', async (t)
   assert.equal(response.status, 403)
   assert.equal(state.orders.length, 0)
   assert.equal(state.attempt.status, 'pending')
+})
+
+test('a gateway PENDING verification redirects to pending without creating an order', async (t) => {
+  const attempt = createAttempt()
+  const state = installMocks(t, {
+    attempt,
+    verification: verificationFor(attempt, { status: 'PENDING' }),
+  })
+
+  const response = await success()
+
+  assert.equal(response.status, 302)
+  assert.match(response.headers.get('location'), /payment=pending/)
+  assert.equal(state.orders.length, 0)
+  assert.equal(state.attempt.status, 'pending')
+  assert.equal(state.stockDeductions, 0)
+  assert.equal(state.couponUses, 0)
 })
 
 test('a verified delayed payment is fulfilled after checkout expiry', async (t) => {

@@ -66,9 +66,14 @@ app.use(cors({
 }))
 
 // Rate limiting
+const positiveNumber = (value, fallback) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: positiveNumber(process.env.AUTH_RATE_LIMIT_MAX, 20),
   message: { message: 'Too many attempts, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -76,7 +81,7 @@ const authLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: positiveNumber(process.env.API_RATE_LIMIT_MAX, 100),
   message: { message: 'Too many requests, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -84,6 +89,7 @@ const apiLimiter = rateLimit({
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }))
+app.use(express.urlencoded({ extended: false }))
 app.use(cookieParser())
 
 // NoSQL injection prevention

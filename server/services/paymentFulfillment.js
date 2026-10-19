@@ -400,8 +400,12 @@ export const fulfillVerifiedPayment = async ({ invoiceId, verification }, deps =
   const hooks = resolved.hooks
 
   if (!invoiceId) return { status: 'rejected', code: 'missing_invoice' }
-  if (String(verification?.status || '').toUpperCase() !== 'COMPLETED') {
-    return { status: 'not_paid', code: 'not_completed' }
+  const gatewayStatus = String(verification?.status || '').toUpperCase()
+  if (gatewayStatus !== 'COMPLETED') {
+    return {
+      status: gatewayStatus === 'PENDING' ? 'pending' : 'not_paid',
+      code: 'not_completed',
+    }
   }
 
   const metadata = parseMetadata(verification?.metadata)
