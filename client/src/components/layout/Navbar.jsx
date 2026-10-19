@@ -5,7 +5,7 @@ import { Search, ShoppingBag, Heart, Menu, X, User, Zap, LogOut, ChevronRight } 
 import { cartCount } from '../../features/cartSlice'
 import { setCartOpen, setSearchOpen, setMobileNavOpen, toast } from '../../features/uiSlice'
 import { logout } from '../../features/authSlice'
-import { useCategories } from '../../hooks/useCategories'
+import { useCategories, useCategoryCounts } from '../../hooks/useCategories'
 
 import Ticker from './Ticker'
 import api from '../../lib/api'
@@ -36,12 +36,12 @@ export default function Navbar() {
   const { user } = useSelector((s) => s.auth)
   const [scrolled, setScrolled] = useState(false)
   const [megaOpen, setMegaOpen] = useState(false)
-  const [catCounts, setCatCounts] = useState({})
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [expandedMobile, setExpandedMobile] = useState({})
   const location = useLocation()
   const navigate = useNavigate()
   const { categories: allCategories } = useCategories()
+  const { counts: catCounts } = useCategoryCounts()
 
   const handleLogout = async () => {
     try { await api.post('/auth/logout') } catch {}
@@ -61,18 +61,6 @@ export default function Navbar() {
     dispatch(setMobileNavOpen(false))
     setMegaOpen(false)
   }, [location.pathname, location.search, dispatch])
-
-  useEffect(() => {
-    if (!megaOpen) return
-    api.get('/products', { params: { limit: 200 } }).then(({ data }) => {
-      const counts = {}
-      allCategories.forEach(c => { counts[c.id] = 0 })
-      data.products.forEach(p => {
-        if (counts[p.category] !== undefined) counts[p.category]++
-      })
-      setCatCounts(counts)
-    }).catch(() => {})
-  }, [megaOpen, allCategories])
 
   const linkCls = ({ isActive }) =>
     `font-head text-sm font-medium uppercase tracking-[0.18em] transition-colors ${
@@ -213,7 +201,7 @@ export default function Navbar() {
                   onClick={() => dispatch(setMobileNavOpen(false))}
                   className="flex items-center justify-between border-b border-line/50 py-3 pl-4 font-display text-lg uppercase tracking-wide text-muted">
                   {sub.name}
-                  {sub.children?.length > 0 && <span className="text-xs">{sub.children.length} items</span>}
+                  <span className="text-xs">{catCounts[sub.id] || 0} items</span>
                 </Link>
               ))}
             </div>

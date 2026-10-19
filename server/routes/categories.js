@@ -4,6 +4,7 @@ import Product from '../models/Product.js'
 import { protect, adminOnly } from '../middleware/auth.js'
 import {
   buildCategoryIndex,
+  buildCategoryProductCounts,
   getDescendants,
   resolveCategoryPath,
   sameStringArray,
@@ -187,6 +188,22 @@ router.get('/children/:parentId', async (req, res, next) => {
     const children = await Category.find({ parent: req.params.parentId, isActive: true })
       .sort({ displayOrder: 1, name: 1 })
     res.json({ categories: children })
+  } catch (err) { next(err) }
+})
+
+// GET /api/categories/counts — public, descendant-aware active product counts
+router.get('/counts', async (_req, res, next) => {
+  try {
+    const [categories, products] = await Promise.all([
+      Category.find().select('_id id parent isActive'),
+      Product.find({ isActive: true }).select('category categoryPath isActive'),
+    ])
+    const counts = buildCategoryProductCounts(categories, products)
+    const publicCounts = {}
+    for (const category of categories) {
+      if (category.isActive) publicCounts[category.id] = counts[category.id] || 0
+    }
+    res.json({ counts: publicCounts })
   } catch (err) { next(err) }
 })
 

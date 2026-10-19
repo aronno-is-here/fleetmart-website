@@ -23,7 +23,7 @@ function CategoryPicker({ value, categoryPath, onChange, categories }) {
       }).filter(Boolean)
       setSelected(chain)
     } else if (value) {
-      const cat = categories.find(c => c.id === value)
+      const cat = categories.find(c => c.id === value) || categories.find(c => c.name === value)
       if (cat) setSelected([cat._id])
       else setSelected([value])
     } else {

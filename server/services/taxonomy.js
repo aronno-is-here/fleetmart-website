@@ -112,3 +112,34 @@ export function getCategoryFamily(index, reference) {
 export function sameStringArray(left = [], right = []) {
   return left.length === right.length && left.every((value, index) => value === right[index])
 }
+
+export function buildCategoryProductCounts(categories = [], products = []) {
+  const index = buildCategoryIndex(categories)
+  const counts = {}
+
+  for (const category of categories) {
+    if (category.id) counts[category.id] = 0
+  }
+
+  for (const product of products) {
+    if (!product || product.isActive === false) continue
+
+    const matched = new Set()
+    const addPath = (reference) => {
+      const resolved = resolveCategoryPath(index, reference)
+      if (!resolved.ok) return
+      for (const id of resolved.path) matched.add(id)
+    }
+
+    addPath(product.category)
+    if (Array.isArray(product.categoryPath)) {
+      for (const entry of product.categoryPath) addPath(entry)
+    }
+
+    for (const id of matched) {
+      if (counts[id] !== undefined) counts[id]++
+    }
+  }
+
+  return counts
+}

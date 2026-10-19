@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   buildCategoryIndex,
+  buildCategoryProductCounts,
   getCategoryFamily,
   getDescendants,
   resolveCategoryPath,
@@ -77,4 +78,31 @@ test('buildCategoryIndex reports duplicate slugs and sameStringArray compares pa
   assert.deepEqual(index.duplicateSlugs, ['jersey'])
   assert.equal(sameStringArray(['a', 'b'], ['a', 'b']), true)
   assert.equal(sameStringArray(['a', 'b'], ['b', 'a']), false)
+})
+
+test('buildCategoryProductCounts counts descendants and legacy category paths once per product', () => {
+  const products = [
+    { category: 'premier', categoryPath: ['jersey', 'club', 'premier'], isActive: true },
+    { category: leaf._id, categoryPath: ['jersey', 'club', 'premier'], isActive: true },
+    { category: 'legacy-name', categoryPath: ['club'], isActive: true },
+    { category: 'premier', categoryPath: ['jersey', 'club', 'premier'], isActive: false },
+    { category: 'boots', categoryPath: ['boots'], isActive: true },
+  ]
+
+  const counts = buildCategoryProductCounts(categories, products)
+
+  assert.deepEqual(counts, {
+    jersey: 3,
+    club: 3,
+    premier: 2,
+    boots: 1,
+  })
+})
+
+test('buildCategoryProductCounts initializes zero for every category and ignores inactive products', () => {
+  const counts = buildCategoryProductCounts(categories, [
+    { category: 'jersey', isActive: false },
+  ])
+
+  assert.deepEqual(counts, { jersey: 0, club: 0, premier: 0, boots: 0 })
 })

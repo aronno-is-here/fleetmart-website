@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Plus, Pencil, Trash2, X, ChevronRight, ChevronDown, GripVertical, Eye, EyeOff } from 'lucide-react'
 import api from '../../lib/api'
+import { collectDescendantIds, collectExpandableIds, filterCategoryTree } from '../../lib/categoryTree'
 
 const EMPTY = { name: '', blurb: '', autoBlurb: true, image: '', parent: null, displayOrder: 0, isHero: false, isKitBuilder: false, isTurfInstallation: false }
 
@@ -134,11 +135,21 @@ export default function AdminCategories() {
     }
   }
 
-  const filteredTree = filter
-    ? tree.filter(c => c.id.includes(filter.toLowerCase()) || c.name.toLowerCase().includes(filter.toLowerCase()))
-    : tree
+  const filteredTree = useMemo(() => filterCategoryTree(tree, filter), [tree, filter])
 
-  const parentOptions = flat.filter(c => c._id !== editing)
+  useEffect(() => {
+    if (!filter.trim()) return
+    setExpanded(collectExpandableIds(filteredTree))
+  }, [filter, filteredTree])
+
+  const blockedIds = useMemo(() => {
+    if (!editing || editing === 'new') return new Set()
+    const editingId = flat.find(c => c._id === editing)?.id
+    if (!editingId) return new Set()
+    return new Set([editingId, ...collectDescendantIds(tree, editingId)])
+  }, [editing, flat, tree])
+
+  const parentOptions = flat.filter(c => c._id !== editing && !blockedIds.has(c.id))
 
   return (
     <div className="space-y-6">

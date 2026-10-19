@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { SlidersHorizontal, X } from 'lucide-react'
-import { useFlatCategories } from '../hooks/useCategories'
+import { useCategories } from '../hooks/useCategories'
 import { useBrands } from '../hooks/useBrands'
 import { useTeams } from '../hooks/useTeams'
 import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
 import PriceRange from '../components/PriceRange'
 import SEO from '../components/SEO'
+import { flattenCategoryTree, findCategoryPath } from '../lib/categoryTree'
 import { fmt } from '../lib/format'
 import api from '../lib/api'
 
@@ -48,13 +49,65 @@ function CheckRow({ checked, onChange, label, hint }) {
   )
 }
 
+function CategoryFilter({ tree, selectedId, onSelect, error }) {
+  const [expanded, setExpanded] = useState({})
+
+  useEffect(() => {
+    const path = findCategoryPath(tree, selectedId)
+    if (!path.length) return
+    setExpanded((prev) => {
+      const next = { ...prev }
+      for (const node of path) {
+        if (node.children?.length) next[node._id] = true
+      }
+      return next
+    })
+  }, [tree, selectedId])
+
+  if (error) return <p className="pt-1 text-xs text-ember">Could not load categories.</p>
+  if (!tree.length) return <p className="pt-1 text-xs text-muted">No categories available.</p>
+
+  const renderNodes = (nodes) => nodes.map((node) => {
+    const hasChildren = node.children?.length > 0
+    const isOpen = !!expanded[node._id]
+    return (
+      <div key={node.id}>
+        <div className="flex items-center gap-1">
+          {hasChildren ? (
+            <button
+              type="button"
+              onClick={() => setExpanded((prev) => ({ ...prev, [node._id]: !prev[node._id] }))}
+              aria-label={isOpen ? `Collapse ${node.name}` : `Expand ${node.name}`}
+              className="w-4 text-xs text-muted hover:text-volt"
+            >
+              {isOpen ? '▾' : '▸'}
+            </button>
+          ) : (
+            <span className="w-4" />
+          )}
+          <div className="flex-1">
+            <CheckRow
+              checked={selectedId === node.id}
+              onChange={() => onSelect(selectedId === node.id ? '' : node.id)}
+              label={node.name}
+            />
+          </div>
+        </div>
+        {hasChildren && isOpen && <div className="ml-4">{renderNodes(node.children)}</div>}
+      </div>
+    )
+  })
+
+  return renderNodes(tree)
+}
+
 export default function Shop() {
   const [params, setParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [products, setProducts] = useState([])
   const [total, setTotal] = useState(0)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const { categories: CATEGORIES } = useFlatCategories()
+  const { categories: CATEGORIES, loading: categoriesLoading, error: categoriesError } = useCategories()
   const { brands } = useBrands()
   const { teams } = useTeams()
 
@@ -107,7 +160,10 @@ export default function Shop() {
     setParams(next, { replace: true })
   }
 
-  const activeCat = CATEGORIES.find((c) => c.id === cat)
+  const flatCategories = flattenCategoryTree(CATEGORIES)
+  const activeCat = flatCategories.find((c) => c.id === cat)
+  const catPath = findCategoryPath(CATEGORIES, cat)
+  const catUnavailable = Boolean(cat) && !categoriesLoading && !categoriesError && flatCategories.length > 0 && !activeCat
   const isFootwear = products.some(p => p.sizeChartType === 'boot')
   const sizeOptions = isFootwear ? BOOT_SIZES : [...new Set([...SIZES, ...BOOT_SIZES])]
 
@@ -119,9 +175,12 @@ export default function Shop() {
     <div>
       <FilterGroup title="Category">
         <CheckRow checked={!cat} onChange={() => setParam('category', '')} label="All Categories" />
-        {CATEGORIES.map((c) => (
-          <CheckRow key={c.id} checked={cat === c.id} onChange={() => setParam('category', c.id)} label={c.name} />
-        ))}
+        <CategoryFilter
+          tree={CATEGORIES}
+          selectedId={cat}
+          onSelect={(id) => setParam('category', id)}
+          error={categoriesError}
+        />
       </FilterGroup>
       <FilterGroup title="Brand">
         {brands.map((b) => (
@@ -167,9 +226,31 @@ export default function Shop() {
       />
       <div className="mb-8 flex items-end justify-between">
         <div>
+          {catPath.length > 1 && (
+            <nav aria-label="Category hierarchy" className="mb-2 flex flex-wrap items-center gap-1.5 text-[11px] font-head uppercase tracking-widest text-muted">
+              <button onClick={() => setParam('category', '')} className="transition-colors hover:text-volt">All</button>
+              {catPath.map((node, index) => (
+                <Fragment key={node.id}>
+                  <span className="text-muted/50">/</span>
+                  <button
+                    onClick={() => setParam('category', node.id)}
+                    className={`transition-colors hover:text-volt ${index === catPath.length - 1 ? 'text-volt' : ''}`}
+                  >
+                    {node.name}
+                  </button>
+                </Fragment>
+              ))}
+            </nav>
+          )}
           <p className="eyebrow mb-2">{q ? `Results for "${q}"` : 'Browse everything'}</p>
           <h1 className="font-display text-5xl uppercase tracking-wide text-chalk sm:text-6xl">{activeCat ? activeCat.name : 'Catalog'}</h1>
           <p className="mt-2 text-sm text-muted">{total} products</p>
+          {catUnavailable && (
+            <p className="mt-2 text-xs text-ember">
+              This category is no longer available.{' '}
+              <button onClick={() => setParam('category', '')} className="underline hover:text-chalk">Clear</button>
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => setFiltersOpen(true)} className="btn-ghost !px-4 !py-2.5 !text-xs lg:hidden">

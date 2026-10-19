@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { motion } from 'framer-motion'
 import { ArrowRight, ChevronLeft, ChevronRight, Timer, Quote } from 'lucide-react'
-import { useFlatCategories } from '../hooks/useCategories'
+import { useCategoryCounts, useFlatCategories } from '../hooks/useCategories'
 import { useTeams } from '../hooks/useTeams'
 import { useBrands } from '../hooks/useBrands'
 import { ProductArt, JerseyArt, BootArt } from '../components/ProductArt'
@@ -66,7 +66,7 @@ function Hero() {
           <div className="mt-8 flex flex-wrap gap-3">
             {heroCat && (
               <Link to={`/shop?category=${heroCat.id}`} className="btn-volt">
-                Shop Jerseys <ArrowRight size={16} />
+                Shop {heroCat.name} <ArrowRight size={16} />
               </Link>
             )}
             <Link to="/shop" className="btn-ghost">Browse All</Link>
@@ -145,19 +145,10 @@ function Hero() {
 }
 
 function CategoryTiles() {
-  const [counts, setCounts] = useState({})
-  const { categories: CATEGORIES } = useFlatCategories()
+  const { categories: CATEGORIES, error } = useFlatCategories()
+  const { counts } = useCategoryCounts()
 
-  useEffect(() => {
-    api.get('/products', { params: { limit: 200 } }).then(({ data }) => {
-      const c = {}
-      CATEGORIES.forEach(cat => { c[cat.id] = 0 })
-      data.products.forEach(p => {
-        if (c[p.category] !== undefined) c[p.category]++
-      })
-      setCounts(c)
-    }).catch(() => {})
-  }, [CATEGORIES])
+  if (error) return null
 
   return (
     <section className="container-fm py-16">

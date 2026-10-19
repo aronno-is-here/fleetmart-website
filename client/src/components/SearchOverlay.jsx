@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { Search, X, ArrowRight } from 'lucide-react'
 import { useFlatCategories } from '../hooks/useCategories'
+import { useBrands } from '../hooks/useBrands'
+import { useTeams } from '../hooks/useTeams'
 import { setSearchOpen } from '../features/uiSlice'
 import { fmt, discounted } from '../lib/format'
 import api from '../lib/api'
@@ -15,6 +17,16 @@ export default function SearchOverlay() {
   const [results, setResults] = useState([])
   const inputRef = useRef(null)
   const { categories: CATEGORIES } = useFlatCategories()
+  const { brands } = useBrands()
+  const { teams } = useTeams()
+
+  const brandNames = useMemo(() => new Map(brands.map((b) => [b.slug, b.name])), [brands])
+  const teamNames = useMemo(() => new Map(teams.map((t) => [t.slug, t.name])), [teams])
+  const categoryNames = useMemo(() => new Map(CATEGORIES.map((c) => [c.id, c.name])), [CATEGORIES])
+  const label = (value, map) => (value ? map.get(value) || value : '')
+  const meta = (product) => [label(product.brand, brandNames), label(product.category, categoryNames), label(product.team, teamNames)]
+    .filter(Boolean)
+    .join(' · ')
 
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 60)
@@ -84,7 +96,7 @@ export default function SearchOverlay() {
                     </span>
                     <span className="flex-1">
                       <span className="block font-head text-sm font-semibold uppercase tracking-wide text-chalk group-hover:text-volt">{p.name}</span>
-                      <span className="text-xs uppercase tracking-widest text-muted">{p.brand} · {p.category}</span>
+                      <span className="text-xs uppercase tracking-widest text-muted">{meta(p)}</span>
                     </span>
                     <span className="font-head font-semibold text-chalk">{fmt(discounted(p))}</span>
                     <ArrowRight size={16} className="text-muted transition-transform group-hover:translate-x-1 group-hover:text-volt" />
