@@ -5,7 +5,7 @@ import { Check, ChevronRight, CreditCard, Truck, Wallet, ShoppingCart, Clock } f
 import { cartTotal } from '../features/cartSlice'
 import { toast } from '../features/uiSlice'
 import { fmt } from '../lib/format'
-import { calculateAmountToPay, calculateOnlineTotal, calculateShippingFee } from '../lib/checkout'
+import { calculateAmountToPay, calculateOnlineTotal, calculateShippingFee, readCouponDiscount } from '../lib/checkout'
 import api from '../lib/api'
 
 const STEPS = ['Address', 'Shipping', 'Payment', 'Review']
@@ -73,7 +73,7 @@ export default function Checkout() {
     api.post('/coupons/validate', { code: couponCode, subtotal: total })
       .then(({ data }) => {
         if (cancelled) return
-        setDiscount(data.discount || 0)
+        setDiscount(readCouponDiscount(data))
       })
       .catch(() => {
         if (cancelled) return

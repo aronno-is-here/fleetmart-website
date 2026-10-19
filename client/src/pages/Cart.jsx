@@ -5,7 +5,7 @@ import { Trash2, Plus, Minus, Tag, X, ArrowRight } from 'lucide-react'
 import { removeFromCart, setQty, cartTotal } from '../features/cartSlice'
 import { toast } from '../features/uiSlice'
 import { fmt } from '../lib/format'
-import { FREE_SHIPPING_THRESHOLD, STANDARD_SHIPPING_FEE } from '../lib/checkout'
+import { FREE_SHIPPING_THRESHOLD, STANDARD_SHIPPING_FEE, readCouponDiscount } from '../lib/checkout'
 import api from '../lib/api'
 
 export default function Cart() {
@@ -23,7 +23,7 @@ export default function Cart() {
     let cancelled = false
     api.post('/coupons/validate', { code, subtotal: total })
       .then(({ data }) => {
-        if (!cancelled) setApplied({ code, discount: data.discount || 0 })
+        if (!cancelled) setApplied({ code, discount: readCouponDiscount(data) })
       })
       .catch(() => {
         if (cancelled) return
@@ -44,8 +44,9 @@ export default function Cart() {
     setValidating(true)
     try {
       const { data } = await api.post('/coupons/validate', { code: c, subtotal: total })
-      setApplied({ code: c, discount: data.discount || 0 })
-      dispatch(toast({ type: 'success', message: `Coupon ${c} applied — ${fmt(data.discount)} off` }))
+      const nextDiscount = readCouponDiscount(data)
+      setApplied({ code: c, discount: nextDiscount })
+      dispatch(toast({ type: 'success', message: `Coupon ${c} applied — ${fmt(nextDiscount)} off` }))
       setCode('')
     } catch (err) {
       dispatch(toast({ type: 'error', message: err.response?.data?.message || 'Invalid or expired coupon' }))

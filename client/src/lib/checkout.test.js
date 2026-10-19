@@ -5,6 +5,7 @@ import {
   calculateAmountToPay,
   calculateOnlineTotal,
   calculateShippingFee,
+  readCouponDiscount,
 } from './checkout.js'
 
 test('online total subtracts the coupon discount and never goes below zero', () => {
@@ -28,4 +29,12 @@ test('shipping is free from 3000 and otherwise matches the server standard fee',
   assert.equal(calculateShippingFee(3000), 0)
   assert.equal(calculateShippingFee(4500), 0)
   assert.equal(calculateShippingFee('1200'), 80)
+})
+
+test('coupon discount is read from the coupon response and supports a flat payload', () => {
+  assert.equal(readCouponDiscount({ coupon: { discount: 300 } }), 300)
+  assert.equal(readCouponDiscount({ discount: '75' }), 75)
+  assert.equal(readCouponDiscount({ coupon: {} }), 0)
+  assert.equal(readCouponDiscount(null), 0)
+  assert.equal(readCouponDiscount({ coupon: { discount: 'invalid' } }), 0)
 })

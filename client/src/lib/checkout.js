@@ -13,6 +13,12 @@ export const calculateShippingFee = (subtotal) => {
   return base >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING_FEE
 }
 
+export const readCouponDiscount = (payload) => {
+  const value = payload?.coupon?.discount ?? payload?.discount
+  const discount = Number(value)
+  return Number.isFinite(discount) && discount > 0 ? discount : 0
+}
+
 export const calculateAmountToPay = (paymentType, onlineTotal) => {
   const total = Math.max(0, Number(onlineTotal) || 0)
   if (paymentType === 'partial') {
