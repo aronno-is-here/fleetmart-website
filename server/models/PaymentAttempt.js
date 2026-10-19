@@ -5,6 +5,7 @@ const paymentAttemptSchema = new mongoose.Schema({
   orderId: { type: String, default: null, sparse: true },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   guestEmail: { type: String, default: null },
+  customerEmail: { type: String, default: null },
   items: [{ type: mongoose.Schema.Types.Mixed }],
   shippingAddress: { type: mongoose.Schema.Types.Mixed },
   paymentMethod: { type: String, enum: ['uddoktapay'] },

@@ -53,11 +53,14 @@ router.post('/initiate', optionalAuth, async (req, res, next) => {
     } = pricing
 
     const attemptId = generateAttemptId()
+    const customerName = shipping?.name || guestName || user?.name || 'Customer'
+    const customerEmail = guestEmail || user?.email || ''
 
     const attempt = await PaymentAttempt.create({
       attemptId,
       user: user?._id || null,
       guestEmail,
+      customerEmail,
       items: validatedItems,
       shippingAddress: {
         label: 'Delivery',
@@ -88,9 +91,6 @@ router.post('/initiate', optionalAuth, async (req, res, next) => {
         amountToPay,
       })
     }
-
-    const customerName = shipping?.name || guestName || user?.name || 'Customer'
-    const customerEmail = guestEmail || user?.email || ''
 
     try {
       const uddoktaResponse = await uddoktapayRequest('/checkout-v2', {
@@ -262,17 +262,19 @@ router.post('/reconcile/:attemptId', protect, adminOnly, async (req, res, next) 
     const attempt = await PaymentAttempt.findOne({ attemptId: req.params.attemptId })
     if (!attempt) return res.status(404).json({ message: 'Payment attempt not found' })
 
-    if (attempt.status === 'completed' && attempt.orderId) {
-      return res.json({ message: 'Payment already reconciled', orderId: attempt.orderId })
-    }
-
     if (!attempt.invoiceId) {
       return res.status(400).json({ message: 'Payment has not been verified yet' })
     }
 
+    const wasCompleted = attempt.status === 'completed'
+
     const result = await processInvoice(attempt.invoiceId)
     if (result.status === 'completed' || result.status === 'already_completed') {
-      return res.json({ message: 'Payment reconciled', orderId: result.orderId })
+      return res.json({
+        message: wasCompleted ? 'Payment already reconciled' : 'Payment reconciled',
+        orderId: result.orderId,
+        receipt: result.receipt,
+      })
     }
 
     return res.status(409).json({ message: 'Reconciliation pending', status: result.status, reason: result.code })

@@ -60,10 +60,18 @@ const orderSchema = new mongoose.Schema({
   stockProcessingAt: { type: Date, default: null },
   stockDeductedAt: { type: Date, default: null },
   stockIssues: [{ type: String }],
+  stockReconciliationRequired: { type: Boolean, default: false },
   couponConsumptionStartedAt: { type: Date, default: null },
   couponConsumedAt: { type: Date, default: null },
   couponConsumptionStatus: { type: String, enum: ['consumed', 'limit_reached', 'failed', null], default: null },
+  couponReconciliationRequired: { type: Boolean, default: false },
+  receiptEmail: { type: String, default: null },
+  receiptStatus: { type: String, enum: ['pending', 'sending', 'sent', 'failed'], default: 'pending' },
+  receiptAttempts: { type: Number, default: 0 },
   receiptSendingAt: { type: Date, default: null },
+  receiptLastAttemptAt: { type: Date, default: null },
+  receiptNextAttemptAt: { type: Date, default: null },
+  receiptLastError: { type: String, default: null },
   receiptSentAt: { type: Date, default: null },
 }, { timestamps: true })
 

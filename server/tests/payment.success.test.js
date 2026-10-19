@@ -6,6 +6,8 @@ import Coupon from '../models/Coupon.js'
 import Order from '../models/Order.js'
 import PaymentAttempt from '../models/PaymentAttempt.js'
 import Product from '../models/Product.js'
+import { fulfillmentDeps } from '../services/paymentFulfillment.js'
+import { transactionRunner, TransactionsUnsupportedError } from '../services/mongoTransactions.js'
 
 process.env.UDDOKTAPAY_API_KEY = 'test-key'
 process.env.UDDOKTAPAY_BASE_URL = 'https://gateway.test'
@@ -64,22 +66,64 @@ const verificationFor = (attempt, overrides = {}) => ({
   ...overrides,
 })
 
-const matchesValue = (value, expected) => {
-  if (expected === null) return value === null || value === undefined
-  return String(value) === String(expected)
+const matchesFilter = (doc, filter) => {
+  for (const [field, expected] of Object.entries(filter || {})) {
+    if (field === '$or') {
+      if (!expected.some((sub) => matchesFilter(doc, sub))) return false
+      continue
+    }
+    if (field.startsWith('$')) continue
+
+    const value = field.split('.').reduce((current, key) => current?.[key], doc)
+
+    if (expected === null) {
+      if (value !== null && value !== undefined) return false
+      continue
+    }
+
+    if (typeof expected === 'object' && !Array.isArray(expected)) {
+      if ('$lt' in expected && !(value != null && new Date(value) < new Date(expected.$lt))) return false
+      if ('$gte' in expected && !(Number(value) >= Number(expected.$gte))) return false
+      if ('$in' in expected && !expected.$in.map(String).includes(String(value))) return false
+      if ('$ne' in expected && String(value) === String(expected.$ne)) return false
+      continue
+    }
+
+    if (String(value) !== String(expected)) return false
+  }
+  return true
 }
 
-const installMocks = (t, { attempt, verification, failCreate = false, couponLimitReached = false, createDelay = 0 }) => {
+const installMocks = (t, {
+  attempt,
+  verification,
+  failCreate = false,
+  couponLimitReached = false,
+  createDelay = 0,
+  sendReceipt = async () => true,
+  transactionFailure = null,
+  initialOrders = [],
+}) => {
   const state = {
     attempt,
     verification,
-    orders: [],
+    orders: [...initialOrders],
     stockDeductions: 0,
     couponUses: 0,
     failNextCreate: failCreate,
     couponLimitReached,
     createDelay,
+    receiptSends: 0,
   }
+
+  t.mock.method(transactionRunner, 'run', async (callback) => {
+    if (transactionFailure) throw transactionFailure
+    return callback({ id: 'test-session' })
+  })
+  t.mock.method(fulfillmentDeps, 'sendReceiptEmail', async (...args) => {
+    state.receiptSends += 1
+    return sendReceipt(...args)
+  })
 
   t.mock.method(axios, 'post', async () => ({ data: state.verification }))
 
@@ -116,45 +160,59 @@ const installMocks = (t, { attempt, verification, failCreate = false, couponLimi
     return { modifiedCount: 1 }
   })
 
-  t.mock.method(Order, 'findOne', async (filter) => (
-    state.orders.find((order) => order.paymentAttemptId === filter.paymentAttemptId) || null
-  ))
+  t.mock.method(Order, 'findOne', async (filter) => {
+    if (filter.paymentAttemptId) {
+      return state.orders.find((order) => order.paymentAttemptId === filter.paymentAttemptId) || null
+    }
+    if (filter._id) {
+      return state.orders.find((order) => String(order._id) === String(filter._id)) || null
+    }
+    if (filter.orderId) {
+      return state.orders.find((order) => order.orderId === filter.orderId) || null
+    }
+    return null
+  })
 
-  t.mock.method(Order, 'create', async (payload) => {
+  t.mock.method(Order, 'create', async (docs) => {
     if (createDelay) await new Promise((resolve) => setTimeout(resolve, createDelay))
     if (state.failNextCreate) {
       state.failNextCreate = false
       throw new Error('Database unavailable while creating order')
     }
 
+    const payload = Array.isArray(docs) ? docs[0] : docs
     const order = {
       _id: `order-${state.orders.length + 1}`,
       stockDeductedAt: null,
       stockProcessingAt: null,
+      stockIssues: [],
+      stockReconciliationRequired: false,
       couponConsumedAt: null,
       couponConsumptionStartedAt: null,
-      receiptSentAt: null,
+      couponReconciliationRequired: false,
+      receiptStatus: 'pending',
+      receiptAttempts: 0,
       receiptSendingAt: null,
+      receiptLastAttemptAt: null,
+      receiptNextAttemptAt: null,
+      receiptLastError: null,
+      receiptSentAt: null,
       ...payload,
     }
     state.orders.push(order)
-    return order
+    return Array.isArray(docs) ? [order] : order
   })
 
   t.mock.method(Order, 'updateOne', async (filter, update) => {
-    const order = state.orders.find((candidate) => (
-      (filter._id && candidate._id === filter._id)
-      || (filter.orderId && candidate.orderId === filter.orderId)
-    ))
+    const order = state.orders.find((candidate) => matchesFilter(candidate, filter))
     if (!order) return { modifiedCount: 0 }
 
-    for (const [field, value] of Object.entries(filter)) {
-      if (field === '_id' || field === 'orderId') continue
-      if (field.startsWith('$')) continue
-      if (!matchesValue(order[field], value)) return { modifiedCount: 0 }
-    }
-
     if (update.$set) Object.assign(order, update.$set)
+    if (update.$inc) {
+      for (const [field, amount] of Object.entries(update.$inc)) {
+        order[field] = (order[field] || 0) + amount
+      }
+    }
     if (update.$push?.statusHistory) {
       order.statusHistory = [...(order.statusHistory || []), update.$push.statusHistory]
     }
@@ -374,6 +432,117 @@ test('concurrent duplicate notifications create exactly one order', async (t) =>
   assert.equal(state.stockDeductions, 1)
   assert.equal(locations.filter((location) => location.includes('/order/success')).length, 1)
   assert.equal(locations.filter((location) => location.includes('payment=pending')).length, 1)
+})
+
+test('fulfillment fails safely when MongoDB transactions are unavailable', async (t) => {
+  const attempt = createAttempt()
+  const state = installMocks(t, {
+    attempt,
+    verification: verificationFor(attempt),
+    transactionFailure: new TransactionsUnsupportedError(),
+  })
+
+  const response = await success()
+
+  assert.equal(response.status, 302)
+  assert.match(response.headers.get('location'), /payment=pending/)
+  assert.equal(state.orders.length, 0)
+  assert.equal(state.stockDeductions, 0)
+  assert.equal(state.couponUses, 0)
+  assert.equal(state.attempt.status, 'paid_pending_order')
+  assert.match(state.attempt.fulfillmentError, /transactions/i)
+})
+
+test('receipt failure does not block completion and completed callbacks retry the receipt', async (t) => {
+  const attempt = createAttempt({
+    guestEmail: 'buyer@example.com',
+    customerEmail: 'buyer@example.com',
+  })
+  let sends = 0
+  const state = installMocks(t, {
+    attempt,
+    verification: verificationFor(attempt),
+    sendReceipt: async () => {
+      sends += 1
+      return sends > 1
+    },
+  })
+
+  const first = await success()
+  assert.equal(first.status, 302)
+  assert.match(first.headers.get('location'), /order\/success/)
+  assert.equal(state.attempt.status, 'completed')
+
+  const order = state.orders[0]
+  assert.equal(order.receiptStatus, 'failed')
+  assert.equal(order.receiptAttempts, 1)
+  assert.equal(order.receiptSentAt, null)
+  assert.match(order.receiptLastError, /Email delivery failed/)
+
+  order.receiptNextAttemptAt = new Date(0)
+  const second = await success()
+
+  assert.equal(second.status, 302)
+  assert.match(second.headers.get('location'), /order\/success/)
+  assert.equal(state.orders.length, 1)
+  assert.equal(state.attempt.status, 'completed')
+  assert.equal(order.receiptStatus, 'sent')
+  assert.equal(order.receiptAttempts, 2)
+  assert.ok(order.receiptSentAt)
+})
+
+test('legacy in-flight markers are flagged for review instead of being skipped or replayed', async (t) => {
+  const attempt = createAttempt({
+    status: 'completed',
+    invoiceId: 'invoice-test-1',
+    orderId: 'FM-LEGACY-1',
+    paymentReceivedAt: new Date(),
+    couponCode: 'SAVE10',
+    couponId: coupon._id,
+  })
+  const legacyOrder = {
+    _id: 'legacy-order-1',
+    orderId: 'FM-LEGACY-1',
+    paymentAttemptId: attempt.attemptId,
+    couponId: coupon._id,
+    couponCode: 'SAVE10',
+    orderStatus: 'confirmed',
+    stockProcessingAt: new Date(Date.now() - 60_000),
+    stockDeductedAt: null,
+    stockIssues: [],
+    stockReconciliationRequired: false,
+    couponConsumptionStartedAt: new Date(Date.now() - 60_000),
+    couponConsumedAt: null,
+    couponReconciliationRequired: false,
+    receiptStatus: 'pending',
+    receiptAttempts: 0,
+    receiptSendingAt: null,
+    receiptNextAttemptAt: null,
+    receiptLastError: null,
+    receiptSentAt: null,
+    statusHistory: [],
+  }
+  const state = installMocks(t, {
+    attempt,
+    verification: verificationFor(attempt),
+    initialOrders: [legacyOrder],
+  })
+
+  const response = await success()
+
+  assert.equal(response.status, 302)
+  assert.match(response.headers.get('location'), /order\/success/)
+  assert.equal(state.orders.length, 1)
+  assert.equal(state.stockDeductions, 0)
+  assert.equal(state.couponUses, 0)
+  assert.equal(legacyOrder.stockReconciliationRequired, true)
+  assert.equal(legacyOrder.stockProcessingAt, null)
+  assert.equal(legacyOrder.couponReconciliationRequired, true)
+  assert.equal(legacyOrder.couponConsumptionStartedAt, null)
+
+  const notes = legacyOrder.statusHistory.map((entry) => entry.note).join(' ')
+  assert.match(notes, /STOCK ISSUE/)
+  assert.match(notes, /COUPON ISSUE/)
 })
 
 test('payment attempt retention is not tied to a TTL index', () => {

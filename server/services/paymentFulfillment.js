@@ -4,10 +4,16 @@ import Order from '../models/Order.js'
 import PaymentAttempt from '../models/PaymentAttempt.js'
 import Product from '../models/Product.js'
 import { buildOrderReceiptEmail, sendEmail } from './email.js'
+import { transactionRunner, TransactionsUnsupportedError } from './mongoTransactions.js'
 import { uddoktapayRequest } from './uddoktapay.js'
 
 const STALE_FULFILLMENT_MS = 5 * 60 * 1000
+const RECEIPT_LEASE_MS = 5 * 60 * 1000
+const RECEIPT_RETRY_DELAY_MS = 5 * 60 * 1000
+const DUPLICATE_ORDER_RETRIES = 5
 const VALID_GATEWAY_METHODS = ['bkash', 'nagad', 'rocket', 'upay', 'bank']
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const generateOrderId = () => `FM-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`
 
@@ -40,6 +46,12 @@ const verificationPatch = (invoiceId, verification, paymentReceivedAt) => ({
   uddoktapayPayload: verification,
 })
 
+const statusNote = (order, note) => ({
+  status: order?.orderStatus || 'confirmed',
+  timestamp: new Date(),
+  note,
+})
+
 const markNeedsReconciliation = async (attemptId, invoiceId, verification, paymentReceivedAt, err) => {
   await PaymentAttempt.updateOne(
     { attemptId, status: { $ne: 'completed' } },
@@ -67,6 +79,7 @@ const buildOrderPayload = (attempt, verification, invoiceId, latePayment) => {
     guestEmail: attempt.guestEmail || null,
     guestName: attempt.shippingAddress?.name || null,
     guestPhone: attempt.shippingAddress?.phone || null,
+    receiptEmail: attempt.customerEmail || attempt.guestEmail || null,
     items: attempt.items,
     shippingAddress: attempt.shippingAddress,
     paymentMethod: 'uddoktapay',
@@ -94,89 +107,126 @@ const buildOrderPayload = (attempt, verification, invoiceId, latePayment) => {
   }
 }
 
-const findOrCreateOrder = async (attempt, verification, invoiceId, latePayment) => {
-  const existing = await Order.findOne({ paymentAttemptId: attempt.attemptId })
+const findOrCreateOrder = async (attempt, verification, invoiceId, latePayment, session) => {
+  const existing = await Order.findOne({ paymentAttemptId: attempt.attemptId }, null, { session })
   if (existing) return existing
 
-  try {
-    return await Order.create(buildOrderPayload(attempt, verification, invoiceId, latePayment))
-  } catch (err) {
-    if (err?.code === 11000) {
-      const duplicate = await Order.findOne({ paymentAttemptId: attempt.attemptId })
-      if (duplicate) return duplicate
-    }
-    throw err
-  }
+  const [created] = await Order.create(
+    [buildOrderPayload(attempt, verification, invoiceId, latePayment)],
+    { session },
+  )
+  return created
 }
 
-const ensureStockDeduction = async (order, attempt) => {
-  const key = orderKey(order)
-  const now = new Date()
-  const claim = await Order.updateOne(
-    { ...key, stockDeductedAt: null, stockProcessingAt: null },
-    { $set: { stockProcessingAt: now } },
-  )
+const runFulfillmentTransaction = async (runner, callback) => {
+  let lastError
+  for (let attempt = 0; attempt < DUPLICATE_ORDER_RETRIES; attempt += 1) {
+    try {
+      return await runner.run(callback)
+    } catch (err) {
+      lastError = err
+      if (err?.code !== 11000) throw err
+      await sleep(20 * (attempt + 1))
+    }
+  }
+  throw lastError
+}
 
-  if (!claim?.modifiedCount) return
+const applyStockDeduction = async (order, attempt, session, hooks) => {
+  if (order.stockDeductedAt) return { status: 'already_deducted' }
+  if (order.stockReconciliationRequired) return { status: 'needs_review' }
+
+  if (order.stockProcessingAt) {
+    await Order.updateOne(
+      { _id: order._id },
+      {
+        $set: { stockReconciliationRequired: true, stockProcessingAt: null },
+        $push: {
+          statusHistory: statusNote(
+            order,
+            'STOCK ISSUE: A prior fulfillment attempt may or may not have deducted stock. Automatic deduction was skipped to avoid double counting. Manual reconciliation required.',
+          ),
+        },
+      },
+      { session },
+    )
+    return { status: 'ambiguous_review' }
+  }
 
   const stockIssues = []
-  for (const item of attempt.items || []) {
+  const items = attempt.items || []
+
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index]
     if (!item.product || !item.size) continue
+
+    let deducted = false
     try {
       const result = await Product.updateOne(
         { _id: item.product, [`stock.${item.size}`]: { $gte: item.qty } },
         { $inc: { [`stock.${item.size}`]: -item.qty } },
+        { session },
       )
-      if (!result?.modifiedCount) {
-        stockIssues.push(`${item.name} (${item.size})`)
-      }
-    } catch {
-      stockIssues.push(`${item.name} (${item.size})`)
+      deducted = Boolean(result?.modifiedCount)
+    } catch (err) {
+      if (err?.name !== 'CastError' && err?.name !== 'ValidationError') throw err
+      deducted = false
     }
+
+    if (!deducted) stockIssues.push(`${item.name} (${item.size})`)
+    await hooks?.afterStockItem?.({ index, item, deducted })
   }
 
   const update = {
-    $set: {
-      stockDeductedAt: new Date(),
-      stockProcessingAt: null,
-      stockIssues,
-    },
+    $set: { stockDeductedAt: new Date(), stockIssues },
   }
-
   if (stockIssues.length > 0) {
     update.$push = {
-      statusHistory: {
-        status: order.orderStatus || 'confirmed',
-        timestamp: new Date(),
-        note: `STOCK ISSUE: Failed to deduct stock for: ${stockIssues.join(', ')}. Manual reconciliation required.`,
-      },
+      statusHistory: statusNote(
+        order,
+        `STOCK ISSUE: Failed to deduct stock for: ${stockIssues.join(', ')}. Manual reconciliation required.`,
+      ),
     }
   }
 
-  await Order.updateOne(key, update)
+  await Order.updateOne(orderKey(order), update, { session })
+  await hooks?.afterStockDeducted?.({ order, stockIssues })
+  return { status: 'deducted', stockIssues }
 }
 
-const ensureCouponConsumption = async (order, attempt) => {
-  const key = orderKey(order)
+const applyCouponConsumption = async (order, attempt, session, hooks) => {
+  if (order.couponConsumedAt) return { status: 'already_consumed' }
+  if (order.couponReconciliationRequired) return { status: 'needs_review' }
+
   let couponId = order.couponId || attempt.couponId || null
   const couponCode = order.couponCode || attempt.couponCode || null
 
   if (!couponId && couponCode) {
-    const coupon = await Coupon.findOne({ code: couponCode })
+    const coupon = await Coupon.findOne({ code: couponCode }, null, { session })
     couponId = coupon?._id || null
     if (couponId) {
-      await Order.updateOne({ ...key, couponId: null }, { $set: { couponId } })
+      await Order.updateOne({ ...orderKey(order), couponId: null }, { $set: { couponId } }, { session })
     }
   }
 
-  if (!couponId || order.couponConsumedAt) return
+  if (!couponId) return { status: 'no_coupon' }
 
-  const claim = await Order.updateOne(
-    { ...key, couponConsumedAt: null, couponConsumptionStartedAt: null },
-    { $set: { couponConsumptionStartedAt: new Date() } },
-  )
-
-  if (!claim?.modifiedCount) return
+  if (order.couponConsumptionStartedAt) {
+    await Order.updateOne(
+      { _id: order._id },
+      {
+        $set: { couponReconciliationRequired: true, couponConsumptionStartedAt: null },
+        $push: {
+          statusHistory: statusNote(
+            order,
+            'COUPON ISSUE: A prior fulfillment attempt may or may not have consumed the coupon. Automatic consumption was skipped to avoid double counting. Manual reconciliation required.',
+          ),
+        },
+      },
+      { session },
+    )
+    return { status: 'ambiguous_review' }
+  }
 
   let status = 'consumed'
   let couponIssue = null
@@ -193,6 +243,7 @@ const ensureCouponConsumption = async (order, attempt) => {
         },
       },
       { $inc: { usedCount: 1 } },
+      { session },
     )
 
     if (!result?.modifiedCount) {
@@ -200,59 +251,154 @@ const ensureCouponConsumption = async (order, attempt) => {
       couponIssue = 'COUPON ISSUE: Payment succeeded but the coupon usage limit was already reached. Manual review required.'
     }
   } catch (err) {
+    if (err?.name !== 'CastError') throw err
     status = 'failed'
     couponIssue = `COUPON ISSUE: Failed to consume coupon: ${err.message}. Manual review required.`
   }
 
   const update = {
-    $set: {
-      couponConsumedAt: new Date(),
-      couponConsumptionStartedAt: null,
-      couponConsumptionStatus: status,
-    },
+    $set: { couponConsumedAt: new Date(), couponConsumptionStatus: status },
   }
-
   if (couponIssue) {
-    update.$push = {
-      statusHistory: {
-        status: order.orderStatus || 'confirmed',
-        timestamp: new Date(),
-        note: couponIssue,
-      },
-    }
+    update.$push = { statusHistory: statusNote(order, couponIssue) }
   }
 
-  await Order.updateOne(key, update)
+  await Order.updateOne(orderKey(order), update, { session })
+  await hooks?.afterCouponConsumed?.({ order, status })
+  return { status }
 }
 
-const sendReceiptOnce = async (order) => {
-  if (!order || order.receiptSentAt) return
-  const recipientEmail = order.user?.email || order.guestEmail
-  if (!recipientEmail) return
+const deliverReceipt = async (order, sendReceiptEmail, hooks) => {
+  if (!order) return { status: 'no_order' }
 
   const key = orderKey(order)
+  const current = await Order.findOne(key)
+  if (!current) return { status: 'no_order' }
+  if (current.receiptSentAt) return { status: 'already_sent' }
+
+  const now = new Date()
+  if (current.receiptNextAttemptAt && new Date(current.receiptNextAttemptAt) > now) {
+    return { status: 'backoff' }
+  }
+
+  const recipient = current.receiptEmail || current.guestEmail
+  if (!recipient) {
+    await Order.updateOne(key, {
+      $set: {
+        receiptStatus: 'failed',
+        receiptLastError: 'No recipient email address is available',
+        receiptNextAttemptAt: new Date(now.getTime() + RECEIPT_RETRY_DELAY_MS),
+      },
+    })
+    return { status: 'no_recipient' }
+  }
+
+  const leaseCutoff = new Date(now.getTime() - RECEIPT_LEASE_MS)
   const claim = await Order.updateOne(
-    { ...key, receiptSentAt: null, receiptSendingAt: null },
-    { $set: { receiptSendingAt: new Date() } },
+    {
+      ...key,
+      receiptSentAt: null,
+      $or: [{ receiptSendingAt: null }, { receiptSendingAt: { $lt: leaseCutoff } }],
+    },
+    {
+      $set: { receiptSendingAt: now, receiptStatus: 'sending', receiptLastAttemptAt: now },
+      $inc: { receiptAttempts: 1 },
+    },
   )
-  if (!claim?.modifiedCount) return
+
+  if (!claim?.modifiedCount) return { status: 'in_progress' }
+
+  await hooks?.beforeReceiptSend?.({ order: current })
 
   try {
-    const sent = await sendEmail(
-      recipientEmail,
-      `FleetMart Order Confirmation - #${order.orderId}`,
-      buildOrderReceiptEmail(order),
+    const sent = await sendReceiptEmail(
+      recipient,
+      `FleetMart Order Confirmation - #${current.orderId}`,
+      buildOrderReceiptEmail(current),
     )
     if (sent === false) throw new Error('Email delivery failed')
+    await hooks?.afterReceiptSent?.({ order: current })
+
     await Order.updateOne(key, {
-      $set: { receiptSentAt: new Date(), receiptSendingAt: null },
+      $set: {
+        receiptSentAt: new Date(),
+        receiptSendingAt: null,
+        receiptStatus: 'sent',
+        receiptLastError: null,
+        receiptNextAttemptAt: null,
+      },
     })
-  } catch {
-    await Order.updateOne(key, { $set: { receiptSendingAt: null } }).catch(() => {})
+    return { status: 'sent' }
+  } catch (err) {
+    const message = String(err?.message || 'Email delivery failed').slice(0, 500)
+    await Order.updateOne(key, {
+      $set: {
+        receiptSendingAt: null,
+        receiptStatus: 'failed',
+        receiptLastError: message,
+        receiptNextAttemptAt: new Date(Date.now() + RECEIPT_RETRY_DELAY_MS),
+      },
+    }).catch(() => {})
+    return { status: 'failed', error: message }
   }
 }
 
-export const fulfillVerifiedPayment = async ({ invoiceId, verification }) => {
+const recoverOrderSideEffects = async (order, attempt, deps) => {
+  if (!order) return { ok: true }
+
+  const needsStock = !order.stockDeductedAt && !order.stockReconciliationRequired
+  const needsCoupon = !order.couponConsumedAt
+    && !order.couponReconciliationRequired
+    && Boolean(order.couponId || attempt.couponId || order.couponCode || attempt.couponCode)
+
+  if (!needsStock && !needsCoupon) return { ok: true }
+
+  try {
+    await runFulfillmentTransaction(deps.transactionRunner, async (session) => {
+      const fresh = await Order.findOne({ _id: order._id }, null, { session })
+      if (!fresh) return
+      await applyStockDeduction(fresh, attempt, session, deps.hooks)
+      await applyCouponConsumption(fresh, attempt, session, deps.hooks)
+    })
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err }
+  }
+}
+
+const recoverCompletedAttempt = async (attempt, deps, attemptId) => {
+  const orderRef = attempt.orderId ? { orderId: attempt.orderId } : { paymentAttemptId: attempt.attemptId }
+  const order = await Order.findOne(orderRef)
+  if (!order) return { receipt: 'no_order' }
+
+  const recovery = await recoverOrderSideEffects(order, attempt, deps)
+  if (!recovery.ok) {
+    await PaymentAttempt.updateOne(
+      { attemptId, status: 'completed' },
+      {
+        $set: {
+          fulfillmentError: `Completed payment still has unfinished side effects: ${String(recovery.error?.message || recovery.error).slice(0, 400)}`,
+        },
+      },
+    ).catch(() => {})
+  }
+
+  const receipt = await deliverReceipt(order, deps.sendReceiptEmail, deps.hooks)
+  return { receipt: receipt.status, orderId: order.orderId }
+}
+
+export const fulfillmentDeps = {
+  transactionRunner,
+  sendReceiptEmail: sendEmail,
+  verifyPayment: uddoktapayRequest,
+}
+
+const resolveDeps = (deps) => ({ ...fulfillmentDeps, ...(deps || {}) })
+
+export const fulfillVerifiedPayment = async ({ invoiceId, verification }, deps = {}) => {
+  const resolved = resolveDeps(deps)
+  const hooks = resolved.hooks
+
   if (!invoiceId) return { status: 'rejected', code: 'missing_invoice' }
   if (String(verification?.status || '').toUpperCase() !== 'COMPLETED') {
     return { status: 'not_paid', code: 'not_completed' }
@@ -299,7 +445,13 @@ export const fulfillVerifiedPayment = async ({ invoiceId, verification }) => {
   }
 
   if (attempt.status === 'completed') {
-    return { status: 'already_completed', orderId: attempt.orderId, attemptId }
+    const recovery = await recoverCompletedAttempt(attempt, resolved, attemptId)
+    return {
+      status: 'already_completed',
+      orderId: recovery.orderId || attempt.orderId,
+      attemptId,
+      receipt: recovery.receipt,
+    }
   }
 
   const now = new Date()
@@ -338,16 +490,62 @@ export const fulfillVerifiedPayment = async ({ invoiceId, verification }) => {
   if (!claimed) {
     const current = await PaymentAttempt.findOne({ attemptId })
     if (current?.status === 'completed' && current.orderId) {
-      return { status: 'already_completed', orderId: current.orderId, attemptId }
+      const recovery = await recoverCompletedAttempt(current, resolved, attemptId)
+      return {
+        status: 'already_completed',
+        orderId: recovery.orderId || current.orderId,
+        attemptId,
+        receipt: recovery.receipt,
+      }
     }
+
+    if (current?.status === 'processing') {
+      const existingOrder = await Order.findOne({ paymentAttemptId: attemptId })
+      if (existingOrder) {
+        const recovery = await recoverOrderSideEffects(existingOrder, current, resolved)
+        if (!recovery.ok) {
+          return { status: 'pending', code: 'side_effect_recovery_failed', attemptId }
+        }
+
+        await PaymentAttempt.updateOne(
+          { attemptId, status: 'processing' },
+          {
+            $set: {
+              status: 'completed',
+              orderId: existingOrder.orderId,
+              completedAt: new Date(),
+              fulfillmentStartedAt: null,
+              fulfillmentError: null,
+            },
+          },
+        )
+
+        const receipt = await deliverReceipt(existingOrder, resolved.sendReceiptEmail, hooks)
+        return {
+          status: 'completed',
+          orderId: existingOrder.orderId,
+          attemptId,
+          latePayment: current.latePayment,
+          receipt: receipt.status,
+        }
+      }
+    }
+
     return { status: 'pending', code: 'fulfillment_in_progress', attemptId }
   }
 
   try {
-    const order = await findOrCreateOrder(claimed, verification, invoiceId, latePayment)
-    await ensureStockDeduction(order, claimed)
-    await ensureCouponConsumption(order, claimed)
-    await sendReceiptOnce(order)
+    await hooks?.afterClaim?.({ attempt: claimed })
+
+    const order = await runFulfillmentTransaction(resolved.transactionRunner, async (session) => {
+      const created = await findOrCreateOrder(claimed, verification, invoiceId, latePayment, session)
+      await hooks?.afterOrderCreated?.({ order: created })
+      await applyStockDeduction(created, claimed, session, hooks)
+      await applyCouponConsumption(created, claimed, session, hooks)
+      return created
+    })
+
+    await hooks?.beforeAttemptCompleted?.({ order })
 
     await PaymentAttempt.updateOne(
       { attemptId, status: { $in: ['processing', 'paid_pending_order'] } },
@@ -363,19 +561,26 @@ export const fulfillVerifiedPayment = async ({ invoiceId, verification }) => {
       },
     )
 
+    const receipt = await deliverReceipt(order, resolved.sendReceiptEmail, hooks)
+
     return {
       status: 'completed',
       orderId: order.orderId,
       attemptId,
       latePayment,
+      receipt: receipt.status,
     }
   } catch (err) {
     await markNeedsReconciliation(attemptId, invoiceId, verification, paymentReceivedAt, err)
+    if (err instanceof TransactionsUnsupportedError || err?.code === 'transactions_unsupported') {
+      return { status: 'pending', code: 'transactions_unsupported', attemptId }
+    }
     throw err
   }
 }
 
-export const processInvoice = async (invoiceId) => {
-  const verification = await uddoktapayRequest('/verify-payment', { invoice_id: invoiceId })
-  return fulfillVerifiedPayment({ invoiceId, verification })
+export const processInvoice = async (invoiceId, deps = {}) => {
+  const resolved = resolveDeps(deps)
+  const verification = await resolved.verifyPayment('/verify-payment', { invoice_id: invoiceId })
+  return fulfillVerifiedPayment({ invoiceId, verification }, deps)
 }
